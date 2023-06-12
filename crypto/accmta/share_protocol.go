@@ -82,13 +82,7 @@ func BobRespondsP(
 	// Bob's Ring Pedersen parameters
 	rpB *zkproofs.RingPedersenParams,
 ) (beta, cB, betaPrm *big.Int, piB *BobProofP, err error) {
-    // check Alice's proof
-    statementA := &zkproofs.EncStatement{
-        K: cA, // Alice's ciphertext
-        N0: pkA.N, // Alice's public key
-        EC: ec, // max size of plaintext
-    }
-	if !proofAlice.Verify(statementA, rpB) {
+	if ! BobVerify(ec, pkA, proofAlice, cA, rpB) {
 		err = errors.New("RangeProofAlice.Verify() returned false")
 		return
 	}
@@ -142,6 +136,26 @@ func BobRespondsP(
 	q := ec.Params().N
 	beta = common.ModInt(q).Sub(big.NewInt(0), betaPrm)
 	return
+}
+
+func BobVerify(
+	ec elliptic.Curve,
+	// Alice's public key
+	pkA *paillier.PublicKey,
+	// Alice's proof
+	proofAlice *zkproofs.EncProof,
+	// Alice's encryption of a under pkA
+	cA *big.Int,
+	// Bob's Ring Pedersen parameters
+	rpB *zkproofs.RingPedersenParams,
+) bool {
+    // check Alice's proof
+    statementA := &zkproofs.EncStatement{
+        K: cA, // Alice's ciphertext
+        N0: pkA.N, // Alice's public key
+        EC: ec, // max size of plaintext
+    }
+	return proofAlice.Verify(statementA, rpB)
 }
 
 func BobRespondsDL(

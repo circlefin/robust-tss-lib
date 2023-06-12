@@ -4,7 +4,7 @@
 // terms governing use, modification, and redistribution, is contained in the
 // file LICENSE at the root of the source code distribution tree.
 
-package signing
+package accsigning
 
 import (
 	"errors"
@@ -202,7 +202,7 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 		p.temp.signRound1Message1s[fromPIdx] = msg
 	case *SignRound1Message2:
 		p.temp.signRound1Message2s[fromPIdx] = msg
-	case *SignRound2Message:
+/*	case *SignRound2Message:
 		p.temp.signRound2Messages[fromPIdx] = msg
 	case *SignRound3Message:
 		p.temp.signRound3Messages[fromPIdx] = msg
@@ -217,7 +217,7 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 	case *SignRound8Message:
 		p.temp.signRound8Messages[fromPIdx] = msg
 	case *SignRound9Message:
-		p.temp.signRound9Messages[fromPIdx] = msg
+		p.temp.signRound9Messages[fromPIdx] = msg */
 	default: // unrecognised message, just ignore!
 		common.Logger.Warningf("unrecognised message ignored: %v", msg)
 		return false, nil

@@ -4,18 +4,16 @@
 package accsigning
 
 import (
-	"crypto/ecdsa"
-	"fmt"
 	"math/big"
-	"runtime"
-	"sync/atomic"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/bnb-chain/tss-lib/common"
+	"github.com/bnb-chain/tss-lib/crypto/accmta"
+	"github.com/bnb-chain/tss-lib/crypto/paillier"
+	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
 	"github.com/bnb-chain/tss-lib/test"
 	"github.com/bnb-chain/tss-lib/tss"
@@ -34,8 +32,9 @@ func setUp(level string) {
 }
 
 func setupParties(t *testing.T)  (
-    params *tss.Parameters,
+    params []*tss.Parameters,
     parties []*LocalParty,
+    outCh chan tss.Message,
 ){
 	setUp("info")
 	threshold := testThreshold
@@ -49,42 +48,92 @@ func setupParties(t *testing.T)  (
 	// PHASE: signing
 	// use a shuffled selection of the list of parties for this test
 	p2pCtx := tss.NewPeerContext(signPIDs)
-	parties := make([]*LocalParty, 0, len(signPIDs))
+	parties = make([]*LocalParty, 0, len(signPIDs))
 
-	errCh := make(chan *tss.Error, len(signPIDs))
-	outCh := make(chan tss.Message, len(signPIDs))
+//	errCh := make(chan *tss.Error, len(signPIDs))
+	outCh = make(chan tss.Message, len(signPIDs))
 	endCh := make(chan common.SignatureData, len(signPIDs))
 
-	updater := test.SharedPartyUpdater
+//	updater := test.SharedPartyUpdater
 
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
-		params := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
-
-		P := NewLocalParty(big.NewInt(42), params, keys[i], outCh, endCh).(*LocalParty)
+		Pparams := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
+        params = append(params, Pparams)
+		P := NewLocalParty(big.NewInt(42), Pparams, keys[i], outCh, endCh).(*LocalParty)
 		parties = append(parties, P)
 	}
-	return params, parties
+	return params, parties, outCh
 }
 
 func TestRound1(t *testing.T) {
-    params, parties := setupParties(t)
-	errCh := make(chan *tss.Error, len(parties))
-	outCh := make(chan tss.Message, len(parties))
-	endCh := make(chan common.SignatureData, len(parties))
+    params, parties, outCh := setupParties(t)
 
     party := parties[0]
-    round1 := accsigning.newRound1(params, party.key, party.data, party.temp, outCh, endCh)
+    partyParams := params[0]
+    round1 := newRound1(partyParams, &party.keys, &party.data, &party.temp, party.out, party.end).(*round1)
+	err := round1.prepare()
+    assert.NoError(t, err)
+    tssError := round1.Start()
+    assert.Nil(t, tssError)
 
-    err := round1.Start()
-    assert.NoError(t, err, "start")
-
-    r1msg1 := make([]*NewSignRound1Message1, 0, len(parties))
-    for j, Pj := range round1.Parties().IDs() {
+    r1msg1 := make([] SignRound1Message1, len(parties))
+    for j, _ := range parties {
         if j == 0 {
             continue
         }
-        r1msg1[j] <- round1.out
+        var msg tss.Message = <-outCh
+        parsedMessage := GetSignRoundMessage(t, msg, "binance.tsslib.ecdsa.accsigning.SignRound1Message1")
+        content, ok := parsedMessage.Content().(*SignRound1Message1)
+        assert.True(t, ok, "could not get content")
+        assert.NotNil(t, content)
+        r1msg1[j] = *content
     }
-    r1msg2 <- round1.out
+    var msg tss.Message = <-outCh
+    parsedMessage := GetSignRoundMessage(t, msg, "binance.tsslib.ecdsa.accsigning.SignRound1Message2")
+    content, ok := parsedMessage.Content().(*SignRound1Message2)
+    assert.True(t, ok, "could not get content")
+    assert.NotNil(t, content)
+    r1msg2 := *content
+
+    for j, receiver := range parties {
+        if j == 0 {
+            continue
+        }
+        ValidateSignRound1Messages(t, &r1msg1[j], &r1msg2, party, receiver)
+    }
+
 }
+
+func ValidateSignRound1Messages(t *testing.T, msg1 *SignRound1Message1, msg2 *SignRound1Message2, sender, receiver *LocalParty) {
+    ValidateRound1XRangeProofAlice(t, msg1, msg2, &sender.keys.PaillierSK.PublicKey, receiver.keys.RingPedersen())
+}
+
+func ValidateRound1XRangeProofAlice(t *testing.T, msg1 *SignRound1Message1, msg2 *SignRound1Message2, pkSender *paillier.PublicKey, rpReceiver *zkproofs.RingPedersenParams) {
+    cA := msg1.UnmarshalCA()
+    proof, err := msg1.UnmarshalRangeProofAlice()
+    assert.NoError(t, err)
+    valid := accmta.BobVerify(
+        tss.EC(),
+        pkSender,
+        proof,
+        cA,
+        rpReceiver,
+    )
+    assert.True(t, valid)
+}
+
+
+func GetSignRoundMessage(t *testing.T, message tss.Message, expectedType string) tss.ParsedMessage {
+    wireBytes, routing, err := message.WireBytes()
+    assert.NoError(t, err)
+    mType :=  message.Type()
+    assert.Equal(t, expectedType, mType)
+	from := routing.From
+    isBroadcast := message.IsBroadcast()
+    parsedMessage, err := tss.ParseWireMessage(wireBytes, from, isBroadcast)
+    assert.NoError(t, err)
+    assert.True(t, parsedMessage.ValidateBasic())
+    return parsedMessage
+}
+

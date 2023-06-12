@@ -5,12 +5,24 @@ import (
 	"math/big"
 
 	"github.com/bnb-chain/tss-lib/common"
-	"github.com/bnb-chain/tss-lib/crypto"
-	cmt "github.com/bnb-chain/tss-lib/crypto/commitments"
-	"github.com/bnb-chain/tss-lib/crypto/mta"
-	"github.com/bnb-chain/tss-lib/crypto/schnorr"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
+)
+
+var (
+	// Ensure that signing messages implement ValidateBasic
+	_ = []tss.MessageContent{
+		(*SignRound1Message1)(nil),
+		(*SignRound1Message2)(nil),
+/*		(*SignRound2Message)(nil),
+		(*SignRound3Message)(nil),
+		(*SignRound4Message)(nil),
+		(*SignRound5Message)(nil),
+		(*SignRound6Message)(nil),
+		(*SignRound7Message)(nil),
+		(*SignRound8Message)(nil),
+		(*SignRound9Message)(nil),*/
+	}
 )
 
 func NewSignRound1Message1(
@@ -19,7 +31,6 @@ func NewSignRound1Message1(
 	proofAlice *zkproofs.EncProof,
 	proofXk *zkproofs.EncProof,
 	proofXgamma *zkproofs.EncProof,
-	proofXkgamma *zkproofs.MulProof,
 	proofXkw *zkproofs.MulStarProof,
 ) tss.ParsedMessage {
 	meta := tss.MessageRouting{
@@ -30,14 +41,12 @@ func NewSignRound1Message1(
 	pa := proofAlice.Bytes()
 	pXk := proofXk.Bytes()
 	pXg := proofXgamma.Bytes()
-	pXkg := proofXkgamma.Bytes()
 	pXkw := proofXkw.Bytes()
 	content := &SignRound1Message1{
     	CA:              cA.Bytes(),
     	RangeProofAlice: pa[:],
     	ProofXK:            pXk[:],
     	ProofXGamma:        pXg[:],
-    	ProofXKgamma:       pXkg[:],
     	ProofXKw:           pXkw[:],
 	}
 	msg := tss.NewMessageWrapper(meta, content)
@@ -50,7 +59,6 @@ func (m *SignRound1Message1) ValidateBasic() bool {
 		common.NonEmptyMultiBytes(m.GetRangeProofAlice(), zkproofs.EncProofParts) &&
 		common.NonEmptyMultiBytes(m.GetProofXK(), zkproofs.EncProofParts) &&
 		common.NonEmptyMultiBytes(m.GetProofXGamma(), zkproofs.EncProofParts) &&
-		common.NonEmptyMultiBytes(m.GetProofXKgamma(), zkproofs.MulProofParts) &&
 		common.NonEmptyMultiBytes(m.GetProofXKw(), zkproofs.MulStarProofParts)
 }
 
@@ -70,10 +78,6 @@ func (m *SignRound1Message1) UnmarshalProofXGamma() (*zkproofs.EncProof, error) 
 	return zkproofs.EncProofFromBytes(m.GetProofXGamma())
 }
 
-func (m *SignRound1Message1) UnmarshalProofXKgamma() (*zkproofs.MulProof, error) {
-	return zkproofs.MulProofFromBytes(m.GetProofXKgamma())
-}
-
 func (m *SignRound1Message1) UnmarshalProofXKw(ec elliptic.Curve) (*zkproofs.MulStarProof, error) {
 	return zkproofs.MulStarProofFromBytes(ec, m.GetProofXKw())
 }
@@ -84,16 +88,19 @@ func (m *SignRound1Message1) UnmarshalProofXKw(ec elliptic.Curve) (*zkproofs.Mul
 func NewSignRound1Message2(
 	from *tss.PartyID,
 	xk, xgamma, xkgamma, xkw *big.Int,
+	proofXkgamma *zkproofs.MulProof,
 ) tss.ParsedMessage {
 	meta := tss.MessageRouting{
 		From:        from,
 		IsBroadcast: true,
 	}
+	pXkg := proofXkgamma.Bytes()
     content := &SignRound1Message2 {
     	XK:  xk.Bytes(),
     	XGamma: xgamma.Bytes(),
     	XKgamma: xkgamma.Bytes(),
     	XKw: xkw.Bytes(),
+    	ProofXKgamma:       pXkg[:],
     }
 	msg := tss.NewMessageWrapper(meta, content)
 	return tss.NewMessage(meta, content, msg)
@@ -104,5 +111,26 @@ func (m *SignRound1Message2) ValidateBasic() bool {
 		common.NonEmptyBytes(m.GetXK()) &&
 		common.NonEmptyBytes(m.GetXGamma()) &&
 		common.NonEmptyBytes(m.GetXKgamma()) &&
-		common.NonEmptyBytes(m.GetXKw())
+		common.NonEmptyBytes(m.GetXKw()) &&
+		common.NonEmptyMultiBytes(m.GetProofXKgamma(), zkproofs.MulProofParts)
+}
+
+func (m *SignRound1Message2) UnmarshalXK() *big.Int {
+	return new(big.Int).SetBytes(m.GetXK())
+}
+
+func (m *SignRound1Message2) UnmarshalXGamma() *big.Int {
+	return new(big.Int).SetBytes(m.GetXGamma())
+}
+
+func (m *SignRound1Message2) UnmarshalXKGamma() *big.Int {
+	return new(big.Int).SetBytes(m.GetXKgamma())
+}
+
+func (m *SignRound1Message2) UnmarshalXKw() *big.Int {
+	return new(big.Int).SetBytes(m.GetXKw())
+}
+
+func (m *SignRound1Message2) UnmarshalProofXKgamma() (*zkproofs.MulProof, error) {
+	return zkproofs.MulProofFromBytes(m.GetProofXKgamma())
 }

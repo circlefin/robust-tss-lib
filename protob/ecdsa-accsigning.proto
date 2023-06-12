@@ -14,8 +14,7 @@ message SignRound1Message1 {
     repeated bytes range_proof_alice = 2;
     repeated bytes proof_x_k = 3;
     repeated bytes proof_x_gamma = 4;
-    repeated bytes proof_x_kgamma =5;
-    repeated bytes proof_x_kw = 6;
+    repeated bytes proof_x_kw = 5;
 }
 
 /*
@@ -26,5 +25,6 @@ message SignRound1Message2 {
     bytes x_gamma = 3;
     bytes x_kgamma =4;
     bytes x_kw = 5;
+    repeated bytes proof_x_kgamma =6;
 }
 

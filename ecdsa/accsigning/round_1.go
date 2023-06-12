@@ -10,8 +10,7 @@ import (
 
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto"
-	"github.com/bnb-chain/tss-lib/crypto/commitments"
-	"github.com/bnb-chain/tss-lib/crypto/mta"
+	"github.com/bnb-chain/tss-lib/crypto/accmta"
 	"github.com/bnb-chain/tss-lib/crypto/paillier"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
@@ -25,7 +24,7 @@ var (
 
 
 // round 1 represents round 1 of the signing part of the GG18 ECDSA TSS spec (Gennaro, Goldfeder; 2018)
-func newRound1(params *tss.Parameters, key *keygen.LocalPartySaveData, data *common.SignatureData, temp *signing.localTempData, out chan<- tss.Message, end chan<- common.SignatureData) tss.Round {
+func newRound1(params *tss.Parameters, key *keygen.LocalPartySaveData, data *common.SignatureData, temp *localTempData, out chan<- tss.Message, end chan<- common.SignatureData) tss.Round {
 	return &round1{
 		&base{params, key, data, temp, out, end, make([]bool, len(params.Parties().IDs())), false, 1}}
 }
@@ -47,8 +46,8 @@ func (round *round1) Start() *tss.Error {
 	round.started = true
 	round.resetOK()
 
-    paillierSK := round.key.PaillierSk
-    paillierPK := &paillier.PublicKey{N: PaillierSK.N}
+    paillierSK := round.key.PaillierSK
+    paillierPK := &paillier.PublicKey{N: paillierSK.N}
     q := round.Params().EC().Params().N
 
 	k := common.GetRandomPositiveInt(q)
@@ -81,10 +80,9 @@ func (round *round1) Start() *tss.Error {
 	    K: Xgamma,
 	}
 
-	kgamma := common.ModInt(q).Mul(k, gamma)
 	// Xkgamma = Xk^gamma rhoxkgamma^N  mod N2
 	// C = Y^gamma * rhoxkgamma^N mod N2
-	Xkgamma, rhoxkgamma, err := HomoMultAndReturnRandomness(gamma, Xk)
+	Xkgamma, rhoxkgamma, err := paillierPK.HomoMultAndReturnRandomness(gamma, Xk)
 	if err != nil {
         return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
 	}
@@ -94,18 +92,15 @@ func (round *round1) Start() *tss.Error {
 	    Rhox: rhoxgamma,
 	}
 	statementXkgamma := &zkproofs.MulStatement{
-	    N: paillierPK,
+	    N: paillierPK.N,
 	    X: Xgamma,
 	    Y: Xk,
 	    C: Xkgamma,
 	}
 
 	bigW := round.temp.bigWs[round.PartyID().Index]
-	expectedBigW := round.Params().EC().ScalarBaseMult(kw)
-	if ! expectedBigW.Equals(bigW) {
-        return round.WrapError(fmt.Errorf("failed to get bigW"))
-	}
-	Xkw, rhokw, err := paillierPK.HomoMultAndReturnRandomness(round.temp.w)
+//	kw := common.ModInt(q).Mul(k, round.temp.w)
+	Xkw, rhokw, err := paillierPK.HomoMultAndReturnRandomness(round.temp.w, Xk)
 	if err != nil {
         return round.WrapError(fmt.Errorf("failed to get init round1"))
 	}
@@ -143,7 +138,7 @@ func (round *round1) Start() *tss.Error {
 		if j == i {
 			continue
 		}
-		ringPedersenJ := round.GetRingPedersen(j)
+		ringPedersenJ := round.key.GetRingPedersen(j)
 		cA, proofAlice, err := accmta.AliceInit(
 		    round.Params().EC(),
             round.key.PaillierPKs[i],
@@ -162,25 +157,19 @@ func (round *round1) Start() *tss.Error {
 		if err != nil {
 			return round.WrapError(fmt.Errorf("failed to create proof Xgamma: %v", err))
 		}
-		proofXkgamma, err :=zkproofs.NewMulProof(witnessXkgamma, statementXkgamma, ringPedersenJ)
-		if err != nil {
-			return round.WrapError(fmt.Errorf("failed to create proof Xkgamma: %v", err))
-		}
-		proofXkw, err := zkproofs.NewMulStarProof(witnessXkw, statementXkw, ringPedersenJ)
-		if err != nil {
-			return round.WrapError(fmt.Errorf("failed to create proof Xkw: %v", err))
-		}
+		proofXkw := zkproofs.NewMulStarProof(witnessXkw, statementXkw, ringPedersenJ)
 		r1msg1 := NewSignRound1Message1(
 		    Pj, round.PartyID(),
 		    cA, proofAlice,
-		    proofXk, proofXkgamma, proofXkgamma, proofXkw,
+		    proofXk, proofXgamma, proofXkw,
 		)
 		round.temp.cis[j] = cA
 		round.out <- r1msg1
 	}
 
 	// broadcast
-	r1msg2 := NewSignRound1Message2(round.PartyID(), Xk, Xgamma, Xkgamma, Xkw)
+	proofXkgamma :=zkproofs.NewMulProof(witnessXkgamma, statementXkgamma)
+	r1msg2 := NewSignRound1Message2(round.PartyID(), Xk, Xgamma, Xkgamma, Xkw, proofXkgamma)
 	round.temp.signRound1Message2s[i] = r1msg2
 	round.out <- r1msg2
 
@@ -241,7 +230,7 @@ func (round *round1) prepare() error {
 	if round.Threshold()+1 > len(ks) {
 		return fmt.Errorf("t+1=%d is not satisfied by the key count of %d", round.Threshold()+1, len(ks))
 	}
-	wi, bigWs := PrepareForSigning(round.Params().EC(), i, len(ks), xi, ks, bigXs)
+	wi, bigWs := signing.PrepareForSigning(round.Params().EC(), i, len(ks), xi, ks, bigXs)
 
 	round.temp.w = wi
 	round.temp.bigWs = bigWs

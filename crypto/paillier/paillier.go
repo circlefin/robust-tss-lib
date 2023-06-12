@@ -153,6 +153,7 @@ func (publicKey *PublicKey) HomoMultAndReturnRandomness(m, c1 *big.Int) (product
     }
 	N2 := publicKey.NSquare()
 	// 2. x^N mod N2
+	x = common.GetRandomPositiveRelativelyPrimeInt(publicKey.N)
 	xN := new(big.Int).Exp(x, publicKey.N, N2)
 	// 3. (ciphertext) * (2) mod N2
 	product = common.ModInt(N2).Mul(ciphertext, xN)
