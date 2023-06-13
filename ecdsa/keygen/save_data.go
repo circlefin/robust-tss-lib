@@ -83,6 +83,15 @@ func (LocalPartySaveData LocalPartySaveData) GetRingPedersen(partyIdIndex int) *
     }
 }
 
+func (LocalPartySaveData *LocalPartySaveData) RingPedersen() *zkproofs.RingPedersenParams {
+    return &zkproofs.RingPedersenParams{
+        N: LocalPartySaveData.NTildei,
+        S: LocalPartySaveData.H1i,
+        T: LocalPartySaveData.H2i,
+    }
+}
+
+
 // BuildLocalSaveDataSubset re-creates the LocalPartySaveData to contain data for only the list of signing parties.
 func BuildLocalSaveDataSubset(sourceData LocalPartySaveData, sortedIDs tss.SortedPartyIDs) LocalPartySaveData {
 	keysToIndices := make(map[string]int, len(sourceData.Ks))
