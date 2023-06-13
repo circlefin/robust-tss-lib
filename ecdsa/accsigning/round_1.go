@@ -66,7 +66,7 @@ func (round *round1) Start() *tss.Error {
 	}
 
 	gamma := common.GetRandomPositiveInt(q)
-	Xgamma, rhoxgamma, err := paillierPK.EncryptAndReturnRandomness(k)
+	Xgamma, rhoxgamma, err := paillierPK.EncryptAndReturnRandomness(gamma)
 	if err != nil {
         return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
 	}

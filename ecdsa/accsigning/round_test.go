@@ -100,16 +100,20 @@ func TestRound1(t *testing.T) {
         if j == 0 {
             continue
         }
-        ValidateSignRound1Messages(t, &r1msg1[j], &r1msg2, party, receiver)
+        ValidateSignRound1Messages(t, round1, &r1msg1[j], &r1msg2, party, receiver)
     }
 
 }
 
-func ValidateSignRound1Messages(t *testing.T, msg1 *SignRound1Message1, msg2 *SignRound1Message2, sender, receiver *LocalParty) {
-    ValidateRound1XRangeProofAlice(t, msg1, msg2, &sender.keys.PaillierSK.PublicKey, receiver.keys.RingPedersen())
+func ValidateSignRound1Messages(t *testing.T, round *round1, msg1 *SignRound1Message1, msg2 *SignRound1Message2, sender, receiver *LocalParty) {
+    ValidateRound1RangeProofAlice(t, msg1, msg2, &sender.keys.PaillierSK.PublicKey, receiver.keys.RingPedersen())
+    ValidateRound1ProofXK(t, msg1, msg2, &sender.keys.PaillierSK.PublicKey, receiver.keys.RingPedersen())
+    ValidateRound1ProofXGamma(t, msg1, msg2, &sender.keys.PaillierSK.PublicKey, receiver.keys.RingPedersen())
+    ValidateRound1ProofXKw(t, round, msg1, msg2, &sender.keys.PaillierSK.PublicKey, receiver.keys.RingPedersen())
+    ValidateRound1ProofXKGamma(t, msg2, &sender.keys.PaillierSK.PublicKey)
 }
 
-func ValidateRound1XRangeProofAlice(t *testing.T, msg1 *SignRound1Message1, msg2 *SignRound1Message2, pkSender *paillier.PublicKey, rpReceiver *zkproofs.RingPedersenParams) {
+func ValidateRound1RangeProofAlice(t *testing.T, msg1 *SignRound1Message1, msg2 *SignRound1Message2, pkSender *paillier.PublicKey, rpReceiver *zkproofs.RingPedersenParams) {
     cA := msg1.UnmarshalCA()
     proof, err := msg1.UnmarshalRangeProofAlice()
     assert.NoError(t, err)
@@ -120,6 +124,65 @@ func ValidateRound1XRangeProofAlice(t *testing.T, msg1 *SignRound1Message1, msg2
         cA,
         rpReceiver,
     )
+    assert.True(t, valid)
+}
+
+func ValidateRound1ProofXK(t *testing.T, msg1 *SignRound1Message1, msg2 *SignRound1Message2, pkSender *paillier.PublicKey, rpReceiver *zkproofs.RingPedersenParams) {
+    Xk := msg2.UnmarshalXK()
+    proof, err := msg1.UnmarshalProofXK()
+    assert.NoError(t, err)
+	statementXk := &zkproofs.EncStatement{
+	    EC: tss.EC(),
+	    N0: pkSender.N,
+	    K: Xk,
+	}
+	valid := proof.Verify(statementXk, rpReceiver)
+    assert.True(t, valid)
+}
+
+func ValidateRound1ProofXGamma(t *testing.T, msg1 *SignRound1Message1, msg2 *SignRound1Message2, pkSender *paillier.PublicKey, rpReceiver *zkproofs.RingPedersenParams) {
+    Xgamma := msg2.UnmarshalXGamma()
+    proof, err := msg1.UnmarshalProofXGamma()
+    assert.NoError(t, err)
+	statementXGamma := &zkproofs.EncStatement{
+	    EC: tss.EC(),
+	    N0: pkSender.N,
+	    K: Xgamma,
+	}
+	valid := proof.Verify(statementXGamma, rpReceiver)
+    assert.True(t, valid)
+}
+
+func ValidateRound1ProofXKw(t *testing.T, round *round1, msg1 *SignRound1Message1, msg2 *SignRound1Message2, pkSender *paillier.PublicKey, rpReceiver *zkproofs.RingPedersenParams) {
+    Xk := msg2.UnmarshalXK()
+    Xkw := msg2.UnmarshalXKw()
+    bigW := round.temp.bigWs[round.PartyID().Index]
+    proof, err := msg1.UnmarshalProofXKw(tss.EC())
+    assert.NoError(t, err)
+    statementXkw := &zkproofs.MulStarStatement{
+        Ell: zkproofs.GetEll(round.Params().EC()),
+        N0: pkSender.N,
+        C: Xk,
+        D: Xkw,
+        X: bigW,
+    }
+	valid := proof.Verify(statementXkw, rpReceiver)
+    assert.True(t, valid)
+}
+
+func ValidateRound1ProofXKGamma(t *testing.T, msg2 *SignRound1Message2, pkSender *paillier.PublicKey) {
+    Xgamma := msg2.UnmarshalXGamma()
+    Xk := msg2.UnmarshalXK()
+    Xkgamma := msg2.UnmarshalXKGamma()
+    proof, err := msg2.UnmarshalProofXKgamma()
+    assert.NoError(t, err)
+	statementXkgamma := &zkproofs.MulStatement{
+	    N: pkSender.N,
+	    X: Xgamma,
+	    Y: Xk,
+	    C: Xkgamma,
+	}
+	valid := proof.Verify(statementXkgamma)
     assert.True(t, valid)
 }
 
