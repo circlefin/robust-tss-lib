@@ -9,13 +9,11 @@ import (
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 )
 
-func TestAffPProof(t *testing.T) {
-	setUp(t)
+func GenerateAffPData(t *testing.T) (*zkproofs.AffPWitness, *zkproofs.AffPStatement){
 	_, pk0, _, err := GetSavedKeys(0)
 	assert.NoError(t, err)
-	_, pk1, rp1, err := GetSavedKeys(1)
+	_, pk1, _, err := GetSavedKeys(1)
 	assert.NoError(t, err)
-
 
 	N02 := new(big.Int).Mul(pk0.N, pk0.N)
 
@@ -54,67 +52,29 @@ func TestAffPProof(t *testing.T) {
         EllPrime: ell,
         EC: ec,
     }
+    return witness, statement
+}
 
+func TestAffPProof(t *testing.T) {
+	setUp(t)
+    witness, statement := GenerateAffPData(t)
 
-	proof, err := zkproofs.NewAffPProof(witness, statement, rp1)
+	proof, err := zkproofs.NewAffPProof(witness, statement, ringPedersen)
 	assert.NoError(t, err)
 	assert.NotNil(t, proof)
 	assert.False(t, proof.Nil())
-	assert.True(t, proof.Verify(statement, rp1), "proof failed to verify")
+	assert.True(t, proof.Verify(statement, ringPedersen), "proof failed to verify")
 }
 
 func TestAffPProofBytes(t *testing.T) {
 	setUp(t)
-	_, pk0, _, err := GetSavedKeys(0)
-	assert.NoError(t, err)
-	_, pk1, rp1, err := GetSavedKeys(1)
-	assert.NoError(t, err)
+    witness, statement := GenerateAffPData(t)
 
-
-	N02 := new(big.Int).Mul(pk0.N, pk0.N)
-
-    // Specifically,the Prover has secret input (x, y, rho, rhox, rhoy) such that
-	x := common.GetRandomPositiveInt(q)
-	y := common.GetRandomPositiveInt(q)
-	rho := common.GetRandomPositiveInt(q) //common.GetRandomPositiveInt(big.NewInt(1))
-	rhox := common.GetRandomPositiveInt(pk1.N)
-	rhoy := common.GetRandomPositiveInt(pk1.N)
-    witness := &zkproofs.AffPWitness {
-        X: x,
-        Y: y,
-        Rho: rho,
-        Rhox: rhox,
-        Rhoy: rhoy,
-    }
-
-    //  C = PaillierEncrypt(N0, random)
-    C := common.GetRandomPositiveInt(N02)
-    //  D  = C^x * (1+N0)^y * rho^N0 mod N0^2
-    Dprime, err := pk0.EncryptWithRandomness(y, rho)
-    assert.NoError(t, err)
-    D := zkproofs.ATimesBToTheCModN(Dprime, C, x, N02)
-    //  X = (1+N1)^x * rhox^N1 mod N1^2
-    X, _ := pk1.EncryptWithRandomness(x, rhox)
-    //  Y = (1+N1)^y * rhoy^N1 mod N1^2
-    Y, _ := pk1.EncryptWithRandomness(y, rhoy)
-    statement := &zkproofs.AffPStatement{
-        C: C,
-        D: D,
-        X: X,
-        Y: Y,
-        N0: pk0.N,
-        N1: pk1.N,
-        Ell: ell,
-        EllPrime: ell,
-        EC: ec,
-    }
-
-
-	proof, err := zkproofs.NewAffPProof(witness, statement, rp1)
+	proof, err := zkproofs.NewAffPProof(witness, statement, ringPedersen)
 	assert.NoError(t, err)
 	assert.NotNil(t, proof)
 	assert.False(t, proof.Nil())
-	assert.True(t, proof.Verify(statement, rp1), "proof failed to verify")
+	assert.True(t, proof.Verify(statement, ringPedersen), "proof failed to verify")
 
 	proofBytes := proof.Bytes()
 	var proofInBytes [][]byte = proofBytes[:]
@@ -122,7 +82,7 @@ func TestAffPProofBytes(t *testing.T) {
 	assert.NoError(t, err, "could not create NewAffPProof")
 	assert.NotNil(t, newProof, "NewAffPProof nil")
 	assert.False(t, newProof.Nil(), "proof has nil fields")
-	assert.True(t,newProof.Verify(statement, rp1), "proof does not verify")
+	assert.True(t,newProof.Verify(statement, ringPedersen), "proof does not verify")
 	assert.Equal(t, 0, proof.A.Cmp(newProof.A))
 	assert.Equal(t, 0, proof.Bx.Cmp(newProof.Bx))
 	assert.Equal(t, 0, proof.By.Cmp(newProof.By))

@@ -14,7 +14,7 @@ import (
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto"
 	cmt "github.com/bnb-chain/tss-lib/crypto/commitments"
-	"github.com/bnb-chain/tss-lib/crypto/mta"
+	"github.com/bnb-chain/tss-lib/crypto/accmta"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -66,15 +66,15 @@ type (
 		cis        []*big.Int
 		bigWs      []*crypto.ECPoint
 		pointGamma *crypto.ECPoint
-		deCommit   cmt.HashDeCommitment
+//		deCommit   cmt.HashDeCommitment
 
 		// round 2
 		betas, // return value of Bob_mid
 		c1jis,
 		c2jis,
 		vs []*big.Int // return value of Bob_mid_wc
-		pi1jis []*mta.ProofBob
-		pi2jis []*mta.ProofBobWC
+		pi1jis []*accmta.BobProofP
+		pi2jis []*accmta.BobProofDL
 
 		// round 5
 		li,
@@ -141,8 +141,8 @@ func NewLocalPartyWithKDD(
 	p.temp.betas = make([]*big.Int, partyCount)
 	p.temp.c1jis = make([]*big.Int, partyCount)
 	p.temp.c2jis = make([]*big.Int, partyCount)
-	p.temp.pi1jis = make([]*mta.ProofBob, partyCount)
-	p.temp.pi2jis = make([]*mta.ProofBobWC, partyCount)
+	p.temp.pi1jis = make([]*accmta.BobProofP, partyCount)
+	p.temp.pi2jis = make([]*accmta.BobProofDL, partyCount)
 	p.temp.vs = make([]*big.Int, partyCount)
 	return p
 }

@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/bnb-chain/tss-lib/common"
+	"github.com/bnb-chain/tss-lib/crypto/accmta"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -133,4 +134,52 @@ func (m *SignRound1Message2) UnmarshalXKw() *big.Int {
 
 func (m *SignRound1Message2) UnmarshalProofXKgamma() (*zkproofs.MulProof, error) {
 	return zkproofs.MulProofFromBytes(m.GetProofXKgamma())
+}
+
+
+func NewSignRound2Message1(
+	to, from *tss.PartyID,
+	c_gamma, c_w *big.Int,
+	proofP *accmta.BobProofP,
+	proofDL *accmta.BobProofDL,
+) tss.ParsedMessage {
+	meta := tss.MessageRouting{
+		From:        from,
+		To:          []*tss.PartyID{to},
+		IsBroadcast: false,
+	}
+	pP := proofP.Bytes()
+	pDL := proofDL.Bytes()
+    content := &SignRound2Message1 {
+    	CGamma:  c_gamma.Bytes(),
+    	CW: c_w.Bytes(),
+    	ProofP: pP[:],
+    	ProofDl: pDL[:],
+    }
+	msg := tss.NewMessageWrapper(meta, content)
+	return tss.NewMessage(meta, content, msg)
+}
+
+func (m *SignRound2Message1) ValidateBasic() bool {
+	return m != nil &&
+		common.NonEmptyBytes(m.GetCGamma()) &&
+		common.NonEmptyBytes(m.GetCW()) &&
+		common.NonEmptyMultiBytes(m.GetProofP(), accmta.BobProofPParts) &&
+		common.NonEmptyMultiBytes(m.GetProofDl(), accmta.BobProofDLParts)
+}
+
+func (m *SignRound2Message1) UnmarshalCGamma() *big.Int {
+	return new(big.Int).SetBytes(m.GetCGamma())
+}
+
+func (m *SignRound2Message1) UnmarshalCW() *big.Int {
+	return new(big.Int).SetBytes(m.GetCW())
+}
+
+func (m *SignRound2Message1) UnmarshalProofP() (*accmta.BobProofP, error) {
+	return accmta.BobProofPFromBytes(m.GetProofP())
+}
+
+func (m *SignRound2Message1) UnmarshalProofDL(ec elliptic.Curve) (*accmta.BobProofDL, error) {
+	return accmta.BobProofDLFromBytes(ec, m.GetProofDl())
 }

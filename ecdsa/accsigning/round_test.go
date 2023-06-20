@@ -5,6 +5,7 @@ package accsigning
 
 import (
 	"math/big"
+    "sync"
 	"testing"
 
 	"github.com/ipfs/go-log"
@@ -50,8 +51,7 @@ func setupParties(t *testing.T)  (
 	p2pCtx := tss.NewPeerContext(signPIDs)
 	parties = make([]*LocalParty, 0, len(signPIDs))
 
-//	errCh := make(chan *tss.Error, len(signPIDs))
-	outCh = make(chan tss.Message, len(signPIDs))
+    outCh = make(chan tss.Message, len(signPIDs))
 	endCh := make(chan common.SignatureData, len(signPIDs))
 
 //	updater := test.SharedPartyUpdater
@@ -77,7 +77,7 @@ func TestRound1(t *testing.T) {
     tssError := round1.Start()
     assert.Nil(t, tssError)
 
-    r1msg1 := make([] SignRound1Message1, len(parties))
+    r1msg1 := make([]SignRound1Message1, len(parties))
     for j, _ := range parties {
         if j == 0 {
             continue
@@ -102,7 +102,6 @@ func TestRound1(t *testing.T) {
         }
         ValidateSignRound1Messages(t, round1, &r1msg1[j], &r1msg2, party, receiver)
     }
-
 }
 
 func ValidateSignRound1Messages(t *testing.T, round *round1, msg1 *SignRound1Message1, msg2 *SignRound1Message2, sender, receiver *LocalParty) {
@@ -186,6 +185,110 @@ func ValidateRound1ProofXKGamma(t *testing.T, msg2 *SignRound1Message2, pkSender
     assert.True(t, valid)
 }
 
+func TestRound2(t *testing.T) {
+    params, parties, outCh := setupParties(t)
+
+    // perform round 1
+    round1s := make([]*round1, len(parties))
+	wg := sync.WaitGroup{}
+	wg.Add(len(parties))
+    for i, party := range parties {
+        go func(i int, party *LocalParty) {
+			defer wg.Done()
+            partyParams := params[i]
+            round1s[i] = newRound1(partyParams, &party.keys, &party.data, &party.temp, party.out, party.end).(*round1)
+        	err := round1s[i].prepare()
+            assert.NoError(t, err)
+            tssError := round1s[i].Start()
+            assert.Nil(t, tssError)
+        }(i, party)
+    }
+
+    // deliver messages form party i to party[0]
+    // there are len(parties)^2 messages on the outCh
+    for msgIndex := 0; msgIndex < len(parties)*len(parties); msgIndex++ {
+        var msg tss.Message = <-outCh
+        if msg.IsBroadcast() {
+            senderIndex := msg.GetFrom().Index
+            if senderIndex != 0 {
+                parsedMessage := GetSignRoundMessage(t, msg, "binance.tsslib.ecdsa.accsigning.SignRound1Message2")
+                round1s[0].temp.signRound1Message2s[senderIndex]=parsedMessage
+            }
+        } else {
+            senderIndex := msg.GetFrom().Index
+            receiverIndex := msg.GetTo()[0].Index
+            if receiverIndex == 0 && senderIndex != 0{
+                parsedMessage := GetSignRoundMessage(t, msg, "binance.tsslib.ecdsa.accsigning.SignRound1Message1")
+                round1s[0].temp.signRound1Message1s[senderIndex]=parsedMessage
+            }
+        }
+    }
+
+    // run round 2 on party 0
+    ok, tssErr := round1s[0].Update()
+    assert.True(t, ok)
+    assert.Nil(t, tssErr)
+    if tssErr != nil {
+        assert.NoError(t, tssErr.Cause())
+    }
+    round2 := round1s[0].NextRound()
+    tssErr = round2.Start()
+    assert.Nil(t, tssErr)
+    if tssErr != nil {
+        assert.NoError(t, tssErr.Cause())
+    }
+
+    // verify the messages from party 0
+    // there are len(parties)-1 messages on the outCh
+    for msgIndex := 0; msgIndex < len(parties)-1; msgIndex++ {
+        var msg tss.Message = <-outCh
+        senderIndexJ := msg.GetFrom().Index
+        assert.Equal(t, 0, senderIndexJ)
+        receiverIndex := msg.GetTo()[0].Index
+        parsedMessage := GetSignRoundMessage(t, msg, "binance.tsslib.ecdsa.accsigning.SignRound2Message1")
+        assert.NotNil(t, parsedMessage)
+
+        //unmarshall the statements
+        r2msg := parsedMessage.Content().(*SignRound2Message1)
+        cGamma := r2msg.UnmarshalCGamma()
+        cW := r2msg.UnmarshalCW()
+        bobProofP, err := r2msg.UnmarshalProofP()
+        assert.NoError(t, err)
+        assert.NotNil(t, bobProofP)
+        assert.NotNil(t, bobProofP.Proof)
+        bobProofDL, err := r2msg.UnmarshalProofDL(tss.EC())
+        assert.NotNil(t, bobProofDL)
+        assert.NotNil(t, bobProofDL.Proof)
+        assert.NoError(t, err)
+
+        // the verifier is receiverIndex who plays Alice
+        rpA := round1s[receiverIndex].key.GetRingPedersen(receiverIndex)
+    	statementP := &zkproofs.AffPStatement{
+            C: round1s[receiverIndex].temp.cis[senderIndexJ], // Alice's ciphertext
+            D: cGamma, // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+            X: bobProofP.X, // encryption of b using Bob's public key
+            Y: bobProofP.Y, // encryption of betaPrm
+    	    N0: round1s[receiverIndex].key.PaillierSK.N, // Alice's public key
+    	    N1: round1s[receiverIndex].key.PaillierPKs[senderIndexJ].N, // Bob's public key
+            Ell: zkproofs.GetEll(tss.EC()), // max size of plaintext
+            EllPrime: zkproofs.GetEll(tss.EC()), // max size of plaintext
+            EC: tss.EC(), // elliptic curve
+    	}
+    	assert.True(t, bobProofP.Proof.Verify(statementP, rpA))
+
+  	    statementDL := &zkproofs.AffGStatement{
+            C: round1s[receiverIndex].temp.cis[senderIndexJ], // Alice's ciphertext cA to senderIndexJ
+            D: cW, // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+            X: round1s[receiverIndex].temp.bigWs[senderIndexJ], // Bob's bigW
+            Y: bobProofDL.Y, // encryption of betaPrm
+    	    N0: round1s[receiverIndex].key.PaillierSK.N, // Alice's public key
+    	    N1: round1s[receiverIndex].key.PaillierPKs[senderIndexJ].N, // Bob's public key
+            Ell: zkproofs.GetEll(tss.EC()), // max size of plaintext
+            EllPrime: zkproofs.GetEll(tss.EC()), // max size of plaintext
+    	}
+    	assert.True(t, bobProofDL.Proof.Verify(statementDL, rpA))
+    }
+}
 
 func GetSignRoundMessage(t *testing.T, message tss.Message, expectedType string) tss.ParsedMessage {
     wireBytes, routing, err := message.WireBytes()

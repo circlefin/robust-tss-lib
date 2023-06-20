@@ -7,6 +7,7 @@ package accmta
 import (
 	"crypto/elliptic"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/bnb-chain/tss-lib/common"
@@ -14,6 +15,12 @@ import (
 	"github.com/bnb-chain/tss-lib/crypto/paillier"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 )
+
+const (
+	BobProofPParts   = zkproofs.AffPProofParts + 2
+	BobProofDLParts   = zkproofs.AffGProofParts + 1
+)
+
 
 type BobProofP struct {
     Proof *zkproofs.AffPProof
@@ -174,16 +181,10 @@ func BobRespondsDL(
 	rpA *zkproofs.RingPedersenParams,
 	// Bob's Ring Pedersen parameters
 	rpB *zkproofs.RingPedersenParams,
-	// Alice's encryption of a under pkA
+	// DL commitment to Bob's input b
 	B *crypto.ECPoint,
 ) (beta, cB, betaPrm *big.Int, piB *BobProofDL, err error) {
-    // check Alice's proof
-    statementA := &zkproofs.EncStatement{
-        K: cA, // Alice's ciphertext
-        N0: pkA.N, // Alice's public key
-        EC: ec, // max size of plaintext
-    }
-	if !proofAlice.Verify(statementA, rpB) {
+	if ! BobVerify(ec, pkA, proofAlice, cA, rpB) {
 		err = errors.New("RangeProofAlice.Verify() returned false")
 		return
 	}
@@ -310,3 +311,64 @@ func AliceEndDL(
 	q := ec.Params().N
 	return new(big.Int).Mod(alphaPrm, q), nil
 }
+
+func (proof *BobProofP) Bytes() [BobProofPParts][]byte {
+    proofBytes := proof.Proof.Bytes()
+    var output [BobProofPParts][]byte
+    for index := 0; index < zkproofs.AffPProofParts; index++ {
+        output[index] = proofBytes[index]
+    }
+    output[zkproofs.AffPProofParts] = proof.X.Bytes()
+    output[zkproofs.AffPProofParts+1] = proof.Y.Bytes()
+
+    return output
+}
+
+func BobProofPFromBytes( bzs [][]byte) (*BobProofP, error) {
+	if !common.NonEmptyMultiBytes(bzs, BobProofPParts) {
+		return nil, fmt.Errorf("expected %d byte parts to construct BobProofP", BobProofPParts)
+	}
+    var proofBytes [zkproofs.AffPProofParts][]byte
+	for index := 0; index < zkproofs.AffPProofParts; index++ {
+	    proofBytes[index] = bzs[index]
+	}
+	proof, err := zkproofs.AffPProofFromBytes(proofBytes[:])
+	if err != nil {
+		return nil, err
+	}
+	return &BobProofP{
+	    Proof: proof,
+	    X: new(big.Int).SetBytes(bzs[zkproofs.AffPProofParts]),
+	    Y: new(big.Int).SetBytes(bzs[zkproofs.AffPProofParts+1]),
+	}, nil
+}
+
+func (proof *BobProofDL) Bytes() [BobProofDLParts][]byte {
+    proofBytes := proof.Proof.Bytes()
+    var output [BobProofDLParts][]byte
+    for index := 0; index < zkproofs.AffGProofParts; index++ {
+        output[index] = proofBytes[index]
+    }
+    output[zkproofs.AffGProofParts] = proof.Y.Bytes()
+
+    return output
+}
+
+func BobProofDLFromBytes(ec elliptic.Curve, bzs [][]byte) (*BobProofDL, error) {
+	if !common.NonEmptyMultiBytes(bzs, BobProofDLParts) {
+		return nil, fmt.Errorf("expected %d byte parts to construct BobProofDL", BobProofDLParts)
+	}
+    var proofBytes [zkproofs.AffGProofParts][]byte
+	for index := 0; index < zkproofs.AffGProofParts; index++ {
+	    proofBytes[index] = bzs[index]
+	}
+	proof, err := zkproofs.AffGProofFromBytes(ec, proofBytes[:])
+	if err != nil {
+		return nil, err
+	}
+	return &BobProofDL{
+	    Proof: proof,
+	    Y: new(big.Int).SetBytes(bzs[zkproofs.AffGProofParts]),
+	}, nil
+}
+
