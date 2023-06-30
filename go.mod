@@ -17,7 +17,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/stretchr/testify v1.3.0
 	golang.org/x/crypto v0.0.0-20170930174604-9419663f5a44
-	golang.org/x/sys v0.0.0-20190712062909-fae7ac547cb7 // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	google.golang.org/protobuf v1.27.1
 )
 
