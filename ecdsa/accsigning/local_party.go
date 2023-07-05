@@ -76,6 +76,7 @@ type (
 		pi1jis []*accmta.BobProofP
 		pi2jis []*accmta.BobProofDL
 
+
 		// round 5
 		li,
 		si,
