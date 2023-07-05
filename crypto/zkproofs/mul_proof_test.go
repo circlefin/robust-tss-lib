@@ -1,7 +1,7 @@
 package zkproofs_test
 
 import (
-    "math/big"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,15 +32,15 @@ func TestMulProof(t *testing.T) {
 	C := zkproofs.PseudoPaillierEncrypt(Y, x, rho, N, N2)
 
 	witness := &zkproofs.MulWitness{
-	    X: x,
-	    Rho: rho,
-	    Rhox: rhox,
+		X:    x,
+		Rho:  rho,
+		Rhox: rhox,
 	}
 	statement := &zkproofs.MulStatement{
-	    N: publicKey.N,
-	    X: X,
-	    Y: Y,
-	    C: C,
+		N: publicKey.N,
+		X: X,
+		Y: Y,
+		C: C,
 	}
 
 	// Prove that:
@@ -74,15 +74,15 @@ func TestMulProofBytes(t *testing.T) {
 	C := zkproofs.PseudoPaillierEncrypt(Y, x, rho, N, N2)
 
 	witness := &zkproofs.MulWitness{
-	    X: x,
-	    Rho: rho,
-	    Rhox: rhox,
+		X:    x,
+		Rho:  rho,
+		Rhox: rhox,
 	}
 	statement := &zkproofs.MulStatement{
-	    N: publicKey.N,
-	    X: X,
-	    Y: Y,
-	    C: C,
+		N: publicKey.N,
+		X: X,
+		Y: Y,
+		C: C,
 	}
 
 	// Prove that:
@@ -99,6 +99,5 @@ func TestMulProofBytes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, newProof)
 	assert.False(t, newProof.Nil())
-	assert.True(t,newProof.Verify(statement))
+	assert.True(t, newProof.Verify(statement))
 }
-

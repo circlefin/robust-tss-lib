@@ -147,10 +147,10 @@ func (publicKey *PublicKey) HomoMult(m, c1 *big.Int) (*big.Int, error) {
 }
 
 func (publicKey *PublicKey) HomoMultAndReturnRandomness(m, c1 *big.Int) (product *big.Int, x *big.Int, err error) {
-    ciphertext, err := publicKey.HomoMult(m, c1)
-    if err != nil {
-        return nil, nil, err
-    }
+	ciphertext, err := publicKey.HomoMult(m, c1)
+	if err != nil {
+		return nil, nil, err
+	}
 	N2 := publicKey.NSquare()
 	// 2. x^N mod N2
 	x = common.GetRandomPositiveRelativelyPrimeInt(publicKey.N)
@@ -159,7 +159,6 @@ func (publicKey *PublicKey) HomoMultAndReturnRandomness(m, c1 *big.Int) (product
 	product = common.ModInt(N2).Mul(ciphertext, xN)
 	return
 }
-
 
 func (publicKey *PublicKey) HomoAdd(c1, c2 *big.Int) (*big.Int, error) {
 	N2 := publicKey.NSquare()
@@ -179,11 +178,10 @@ func (publicKey *PublicKey) HomoAddInt(m, c1 *big.Int) (*big.Int, error) {
 	}
 	c2, err := publicKey.EncryptWithRandomness(m, big.NewInt(1))
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
 	return publicKey.HomoAdd(c1, c2)
 }
-
 
 func (publicKey *PublicKey) NSquare() *big.Int {
 	return new(big.Int).Mul(publicKey.N, publicKey.N)
@@ -229,10 +227,10 @@ func (privateKey *PrivateKey) Decrypt(c *big.Int) (m *big.Int, err error) {
 // Paillier paper uses different variable names as the rest of this code.
 // Rhe = m1
 func (privateKey *PrivateKey) DecryptFull(c *big.Int) (m *big.Int, rho *big.Int, err error) {
-    m, err = privateKey.Decrypt(c)
-    if err != nil {
-        return nil, nil, err
-    }
+	m, err = privateKey.Decrypt(c)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// 4. (Paillier Step 2) c' = cg^(-m1) mod n
 	// 4. (This code) cprime = c * gamma^(-m) mod N

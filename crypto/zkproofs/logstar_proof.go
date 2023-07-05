@@ -18,8 +18,8 @@
 package zkproofs
 
 import (
-    "crypto/elliptic"
-    "fmt"
+	"crypto/elliptic"
+	"fmt"
 	"math/big"
 
 	"github.com/bnb-chain/tss-lib/common"
@@ -28,39 +28,38 @@ import (
 )
 
 const (
-	LogStarProofParts   = 8
+	LogStarProofParts = 8
 )
-
 
 // Note: (z,u,v) are lowercase in CGG21 Figure 29.
 type LogStarProof struct {
-	S *big.Int // mod Nhat
-	A *big.Int // mod N02
-	Y *crypto.ECPoint // G
-	D *big.Int // mod Nhat
-	Z1 *big.Int //
-	Z2 *big.Int // mod N0
-	Z3 *big.Int //
+	S  *big.Int        // mod Nhat
+	A  *big.Int        // mod N02
+	Y  *crypto.ECPoint // G
+	D  *big.Int        // mod Nhat
+	Z1 *big.Int        //
+	Z2 *big.Int        // mod N0
+	Z3 *big.Int        //
 }
 
 type LogStarWitness struct {
-    X *big.Int
-    Rho *big.Int
+	X   *big.Int
+	Rho *big.Int
 }
 
 type LogStarStatement struct {
-    Ell *big.Int
-    N0 *big.Int
-    C *big.Int
-    X *crypto.ECPoint
+	Ell *big.Int
+	N0  *big.Int
+	C   *big.Int
+	X   *crypto.ECPoint
 }
 
 // log* in CGG21 in CGG21 Appendix C.2 Figure 25
 // todo: check proof for typos - especially modular reduction for some values.
 func NewLogStarProof(wit *LogStarWitness, stmt *LogStarStatement, rp *RingPedersenParams) *LogStarProof {
-    // derive some parameters
-    ec := stmt.X.Curve()
-    ecpc := NewEll(stmt.Ell)
+	// derive some parameters
+	ec := stmt.X.Curve()
+	ecpc := NewEll(stmt.Ell)
 
 	// 1. Prover samples alpha, mu, r, gamma
 	alpha := common.GetRandomPositiveInt(ecpc.TwoPowEllPlusEpsilon)
@@ -72,8 +71,8 @@ func NewLogStarProof(wit *LogStarWitness, stmt *LogStarStatement, rp *RingPeders
 	gammRange := new(big.Int).Mul(ecpc.TwoPowEllPlusEpsilon, rp.N)
 	gamma := common.GetRandomPositiveInt(gammRange)
 
-    // S=s^x *t^mu mod Nhat
-    S := rp.Commit(wit.X, mu)
+	// S=s^x *t^mu mod Nhat
+	S := rp.Commit(wit.X, mu)
 
 	//A = (1+N0)^alpha * r^N0 mod N02
 	// we can ignore error when encrypting because we chose the range
@@ -87,7 +86,7 @@ func NewLogStarProof(wit *LogStarWitness, stmt *LogStarStatement, rp *RingPeders
 	D := rp.Commit(alpha, gamma)
 
 	proof := &LogStarProof{
-	    S: S,
+		S: S,
 		A: A,
 		Y: Y,
 		D: D,
@@ -120,17 +119,17 @@ func (proof *LogStarProof) Verify(stmt *LogStarStatement, rp *RingPedersenParams
 		return false
 	}
 
-    // derive some parameters
-    ec := stmt.X.Curve()
+	// derive some parameters
+	ec := stmt.X.Curve()
 
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
 
-    // check (1+N0)^z1 * z2^N0 mod N02 == A * C^e mod N02
-    N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
- 	pkN0 := &paillier.PublicKey{N: stmt.N0}
- 	left1, err := pkN0.EncryptWithRandomness(proof.Z1, proof.Z2)
- 	right1 := ATimesBToTheCModN(proof.A,stmt.C,e,N02)
+	// check (1+N0)^z1 * z2^N0 mod N02 == A * C^e mod N02
+	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
+	pkN0 := &paillier.PublicKey{N: stmt.N0}
+	left1, err := pkN0.EncryptWithRandomness(proof.Z1, proof.Z2)
+	right1 := ATimesBToTheCModN(proof.A, stmt.C, e, N02)
 	if err != nil || left1.Cmp(right1) != 0 {
 		return false
 	}
@@ -138,57 +137,57 @@ func (proof *LogStarProof) Verify(stmt *LogStarStatement, rp *RingPedersenParams
 	// check g^z1 = Y * X^e \in G
 	left2 := crypto.ScalarBaseMult(ec, proof.Z1)
 	right2, err := proof.Y.Add(stmt.X.ScalarMult(e))
-    if err != nil || !left2.Equals(right2) {
-        return false
-    }
+	if err != nil || !left2.Equals(right2) {
+		return false
+	}
 
 	// check s^z1 * t^z3 == D * S^e mod Nhat
-    left3 := rp.Commit(proof.Z1, proof.Z3)
-    right3 := ATimesBToTheCModN(proof.D, proof.S, e, rp.N)
+	left3 := rp.Commit(proof.Z1, proof.Z3)
+	right3 := ATimesBToTheCModN(proof.D, proof.S, e, rp.N)
 	if left3.Cmp(right3) != 0 {
 		return false
 	}
 
-    // Check z1 in [-2^{ell+epsilon}...+2^{ell+epsilon}]
-    if ! NewEll(stmt.Ell).InRange(proof.Z1) {
-        return false
-    }
+	// Check z1 in [-2^{ell+epsilon}...+2^{ell+epsilon}]
+	if !NewEll(stmt.Ell).InRange(proof.Z1) {
+		return false
+	}
 
 	return true
 }
 
 func (proof *LogStarProof) GetChallenge(stmt *LogStarStatement, rp *RingPedersenParams) *big.Int {
-    params := stmt.X.Curve().Params()
+	params := stmt.X.Curve().Params()
 	msg := []*big.Int{
-	    stmt.Ell, params.Gx, params.Gy, params.N, big.NewInt(int64(params.BitSize)),
-	    stmt.N0, stmt.X.X(), stmt.X.Y(), stmt.C,
-	    rp.N, rp.S, rp.T,
-	    proof.S, proof.A, proof.Y.X(), proof.Y.Y(), proof.D}
+		stmt.Ell, params.Gx, params.Gy, params.N, big.NewInt(int64(params.BitSize)),
+		stmt.N0, stmt.X.X(), stmt.X.Y(), stmt.C,
+		rp.N, rp.S, rp.T,
+		proof.S, proof.A, proof.Y.X(), proof.Y.Y(), proof.D}
 	e := common.SHA512_256i(msg...)
 	return e
 }
 
-func (proof * LogStarProof) Nil() bool {
+func (proof *LogStarProof) Nil() bool {
 	if proof == nil {
-	    return true
+		return true
 	}
-	if proof.S == nil || proof.A == nil || proof.Y  == nil|| proof.D  == nil|| proof.Z1  == nil|| proof.Z2  == nil || proof.Z3 == nil {
-        return true
+	if proof.S == nil || proof.A == nil || proof.Y == nil || proof.D == nil || proof.Z1 == nil || proof.Z2 == nil || proof.Z3 == nil {
+		return true
 	}
 	return false
 }
 
 func (proof *LogStarProof) Bytes() [LogStarProofParts][]byte {
 	return [...][]byte{
-    		proof.S.Bytes(),
-    		proof.A.Bytes(),
-    		proof.Y.X().Bytes(),
-    		proof.Y.Y().Bytes(),
-    		proof.D.Bytes(),
-    		proof.Z1.Bytes(),
-    		proof.Z2.Bytes(),
-    		proof.Z3.Bytes(),
-    }
+		proof.S.Bytes(),
+		proof.A.Bytes(),
+		proof.Y.X().Bytes(),
+		proof.Y.Y().Bytes(),
+		proof.D.Bytes(),
+		proof.Z1.Bytes(),
+		proof.Z2.Bytes(),
+		proof.Z3.Bytes(),
+	}
 }
 
 func LogStarProofFromBytes(ec elliptic.Curve, bzs [][]byte) (*LogStarProof, error) {
@@ -196,17 +195,17 @@ func LogStarProofFromBytes(ec elliptic.Curve, bzs [][]byte) (*LogStarProof, erro
 		return nil, fmt.Errorf("expected %d byte parts to construct LogStarProof", LogStarProofParts)
 	}
 	Y, err := crypto.NewECPoint(
-	    ec,
+		ec,
 		new(big.Int).SetBytes(bzs[2]),
 		new(big.Int).SetBytes(bzs[3]))
 	if err != nil {
 		return nil, err
 	}
 	return &LogStarProof{
-		S: new(big.Int).SetBytes(bzs[0]),
-		A: new(big.Int).SetBytes(bzs[1]),
-		Y: Y,
-		D: new(big.Int).SetBytes(bzs[4]),
+		S:  new(big.Int).SetBytes(bzs[0]),
+		A:  new(big.Int).SetBytes(bzs[1]),
+		Y:  Y,
+		D:  new(big.Int).SetBytes(bzs[4]),
 		Z1: new(big.Int).SetBytes(bzs[5]),
 		Z2: new(big.Int).SetBytes(bzs[6]),
 		Z3: new(big.Int).SetBytes(bzs[7]),

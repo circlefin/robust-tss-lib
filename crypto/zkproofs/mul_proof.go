@@ -14,14 +14,14 @@
 package zkproofs
 
 import (
-    "fmt"
+	"fmt"
 	"math/big"
 
 	"github.com/bnb-chain/tss-lib/common"
 )
 
 const (
-	MulProofParts   = 5
+	MulProofParts = 5
 )
 
 // Note: (z,u,v) are lowercase in CGG21 Figure 29.
@@ -34,16 +34,16 @@ type MulProof struct {
 }
 
 type MulWitness struct {
-    X *big.Int // lowercase in Figure 29
-    Rho *big.Int
-    Rhox *big.Int
+	X    *big.Int // lowercase in Figure 29
+	Rho  *big.Int
+	Rhox *big.Int
 }
 
 type MulStatement struct {
-    N *big.Int // Paillier public key
-    X *big.Int // Paillier ciphertext
-    Y *big.Int // Paillier ciphertext
-    C *big.Int // Paillier ciphertext
+	N *big.Int // Paillier public key
+	X *big.Int // Paillier ciphertext
+	Y *big.Int // Paillier ciphertext
+	C *big.Int // Paillier ciphertext
 }
 
 // mul in CGG21 in CGG21 Appendix C.6 Figure 29
@@ -101,8 +101,8 @@ func (proof *MulProof) Verify(stmt *MulStatement) bool {
 	e := proof.GetChallenge(stmt)
 
 	// check Y^z * u^N mod N2 == A * C^e mod N2
-    left1 := PseudoPaillierEncrypt(stmt.Y, proof.Z, proof.U, stmt.N, N2)
-    right1 := ATimesBToTheCModN(proof.A,stmt.C,e,N2)
+	left1 := PseudoPaillierEncrypt(stmt.Y, proof.Z, proof.U, stmt.N, N2)
+	right1 := ATimesBToTheCModN(proof.A, stmt.C, e, N2)
 	if left1.Cmp(right1) != 0 {
 		return false
 	}
@@ -112,7 +112,7 @@ func (proof *MulProof) Verify(stmt *MulStatement) bool {
 	// Note: CGG21 Fig 29 typo has c^N instead of v^N
 	Nplus1 := new(big.Int).Add(big.NewInt(1), stmt.N)
 	left2 := PseudoPaillierEncrypt(Nplus1, proof.Z, proof.V, stmt.N, N2)
-    right2 := ATimesBToTheCModN(proof.B, stmt.X, e, N2)
+	right2 := ATimesBToTheCModN(proof.B, stmt.X, e, N2)
 
 	if left2.Cmp(right2) != 0 {
 		return false
@@ -124,27 +124,27 @@ func (proof *MulProof) Verify(stmt *MulStatement) bool {
 func (proof *MulProof) GetChallenge(stmt *MulStatement) *big.Int {
 	msg := []*big.Int{stmt.N, stmt.X, stmt.Y, stmt.C, proof.A, proof.B}
 	e := common.SHA512_256i(msg...)
-    return e
+	return e
 }
 
-func (proof * MulProof) Nil() bool {
+func (proof *MulProof) Nil() bool {
 	if proof == nil {
-	    return true
+		return true
 	}
-	if proof.A == nil || proof.B  == nil|| proof.Z  == nil|| proof.U  == nil|| proof.V  == nil {
-        return true
+	if proof.A == nil || proof.B == nil || proof.Z == nil || proof.U == nil || proof.V == nil {
+		return true
 	}
 	return false
 }
 
 func (proof *MulProof) Bytes() [MulProofParts][]byte {
 	return [...][]byte{
-    		proof.A.Bytes(),
-    		proof.B.Bytes(),
-    		proof.Z.Bytes(),
-    		proof.U.Bytes(),
-    		proof.V.Bytes(),
-    }
+		proof.A.Bytes(),
+		proof.B.Bytes(),
+		proof.Z.Bytes(),
+		proof.U.Bytes(),
+		proof.V.Bytes(),
+	}
 }
 
 func MulProofFromBytes(bzs [][]byte) (*MulProof, error) {
