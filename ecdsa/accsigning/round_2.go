@@ -36,8 +36,8 @@ func (round *round2) Start() *tss.Error {
 		go func(j int, Pj *tss.PartyID) {
 			defer wg.Done()
 			if round.temp.signRound1Message1s[j] == nil {
-			    errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j ))
-			    return
+				errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j))
+				return
 			}
 			r1msg := round.temp.signRound1Message1s[j].Content().(*SignRound1Message1)
 			rangeProofAliceJ, err := r1msg.UnmarshalRangeProofAlice()
@@ -46,25 +46,25 @@ func (round *round2) Start() *tss.Error {
 				return
 			}
 			cA := r1msg.UnmarshalCA()
-    		ringPedersenBobI := round.key.GetRingPedersen(i)
-    		ringPedersenAliceJ := round.key.GetRingPedersen(j)
-            beta, cGamma, _, proofP, err := accmta.BobRespondsP(
-            	round.Params().EC(),
-            	// Alice's public key
-            	round.key.PaillierPKs[j],
-            	// Bob's public key
-            	round.key.PaillierPKs[i],
-            	// Alice's proof
-            	rangeProofAliceJ,
-            	// Bob's secret
-            	round.temp.gamma,
-            	// Alice's encryption of a under pkA
-            	cA,
-            	// Alice's Ring Pedersen parameters
-            	ringPedersenAliceJ,
-            	// Bob's Ring Pedersen parameters
-            	ringPedersenBobI,
-            )
+			ringPedersenBobI := round.key.GetRingPedersen(i)
+			ringPedersenAliceJ := round.key.GetRingPedersen(j)
+			beta, cGamma, _, proofP, err := accmta.BobRespondsP(
+				round.Params().EC(),
+				// Alice's public key
+				round.key.PaillierPKs[j],
+				// Bob's public key
+				round.key.PaillierPKs[i],
+				// Alice's proof
+				rangeProofAliceJ,
+				// Bob's secret
+				round.temp.gamma,
+				// Alice's encryption of a under pkA
+				cA,
+				// Alice's Ring Pedersen parameters
+				ringPedersenAliceJ,
+				// Bob's Ring Pedersen parameters
+				ringPedersenBobI,
+			)
 
 			// should be thread safe as these are pre-allocated
 			round.temp.betas[j] = beta
@@ -78,8 +78,8 @@ func (round *round2) Start() *tss.Error {
 		go func(j int, Pj *tss.PartyID) {
 			defer wg.Done()
 			if round.temp.signRound1Message1s[j] == nil {
-			    errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j ))
-			    return
+				errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j))
+				return
 			}
 			r1msg := round.temp.signRound1Message1s[j].Content().(*SignRound1Message1)
 			rangeProofAliceJ, err := r1msg.UnmarshalRangeProofAlice()
@@ -87,28 +87,28 @@ func (round *round2) Start() *tss.Error {
 				errChs <- round.WrapError(errorspkg.Wrapf(err, "UnmarshalRangeProofAlice failed"), Pj)
 				return
 			}
- 			cA := r1msg.UnmarshalCA()
-     		ringPedersenBobI := round.key.GetRingPedersen(i)
-     		ringPedersenAliceJ := round.key.GetRingPedersen(j)
-            v, cW, _, proofDL, err := accmta.BobRespondsDL(
-           	round.Params().EC(),
-            	// Alice's public key
-            	round.key.PaillierPKs[j],
-            	// Bob's public key
-            	round.key.PaillierPKs[i],
-            	// Alice's proof
-            	rangeProofAliceJ,
-            	// Bob's secret
-            	round.temp.w,
-            	// Alice's encryption of a under pkA
-            	cA,
-            	// Alice's Ring Pedersen parameters
-            	ringPedersenAliceJ,
-            	// Bob's Ring Pedersen parameters
-            	ringPedersenBobI,
-            	// DL commitment to Bob's input b
-            	round.temp.bigWs[i],
-            )
+			cA := r1msg.UnmarshalCA()
+			ringPedersenBobI := round.key.GetRingPedersen(i)
+			ringPedersenAliceJ := round.key.GetRingPedersen(j)
+			v, cW, _, proofDL, err := accmta.BobRespondsDL(
+				round.Params().EC(),
+				// Alice's public key
+				round.key.PaillierPKs[j],
+				// Bob's public key
+				round.key.PaillierPKs[i],
+				// Alice's proof
+				rangeProofAliceJ,
+				// Bob's secret
+				round.temp.w,
+				// Alice's encryption of a under pkA
+				cA,
+				// Alice's Ring Pedersen parameters
+				ringPedersenAliceJ,
+				// Bob's Ring Pedersen parameters
+				ringPedersenBobI,
+				// DL commitment to Bob's input b
+				round.temp.bigWs[i],
+			)
 			round.temp.vs[j] = v
 			round.temp.c2jis[j] = cW
 			round.temp.pi2jis[j] = proofDL

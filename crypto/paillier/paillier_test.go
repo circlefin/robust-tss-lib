@@ -130,7 +130,7 @@ func TestHomoMulAndReturnRandomness(t *testing.T) {
 	assert.Equal(t, 0, multiple.Cmp(big.NewInt(exp)))
 
 	// check randomness
-	N2 :=new(big.Int).Mul(publicKey.N, publicKey.N)
+	N2 := new(big.Int).Mul(publicKey.N, publicKey.N)
 	rhoN := new(big.Int).Exp(rho, publicKey.N, N2)
 	expectedcm := new(big.Int).Mul(three, rhoN, N2)
 	assert.Equal(t, 0, expectedcm.Cmp(cm))

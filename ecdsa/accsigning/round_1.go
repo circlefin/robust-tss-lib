@@ -22,7 +22,6 @@ var (
 	zero = big.NewInt(0)
 )
 
-
 // round 1 represents round 1 of the signing part of the GG18 ECDSA TSS spec (Gennaro, Goldfeder; 2018)
 func newRound1(params *tss.Parameters, key *keygen.LocalPartySaveData, data *common.SignatureData, temp *localTempData, out chan<- tss.Message, end chan<- common.SignatureData) tss.Round {
 	return &round1{
@@ -46,104 +45,104 @@ func (round *round1) Start() *tss.Error {
 	round.started = true
 	round.resetOK()
 
-    paillierSK := round.key.PaillierSK
-    paillierPK := &paillier.PublicKey{N: paillierSK.N}
-    q := round.Params().EC().Params().N
+	paillierSK := round.key.PaillierSK
+	paillierPK := &paillier.PublicKey{N: paillierSK.N}
+	q := round.Params().EC().Params().N
 
 	k := common.GetRandomPositiveInt(q)
 	Xk, rhoxk, err := paillierPK.EncryptAndReturnRandomness(k)
 	if err != nil {
-        return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
+		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
 	}
-    witnessXk := &zkproofs.EncWitness{
-        K: k,
-        Rho: rhoxk,
-    }
+	witnessXk := &zkproofs.EncWitness{
+		K:   k,
+		Rho: rhoxk,
+	}
 	statementXk := &zkproofs.EncStatement{
-	    EC: round.Params().EC(),
-	    N0: paillierPK.N,
-	    K: Xk,
+		EC: round.Params().EC(),
+		N0: paillierPK.N,
+		K:  Xk,
 	}
 
 	gamma := common.GetRandomPositiveInt(q)
 	Xgamma, rhoxgamma, err := paillierPK.EncryptAndReturnRandomness(gamma)
 	if err != nil {
-        return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
+		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
 	}
-    witnessXgamma := &zkproofs.EncWitness{
-        K: gamma,
-        Rho: rhoxgamma,
-    }
+	witnessXgamma := &zkproofs.EncWitness{
+		K:   gamma,
+		Rho: rhoxgamma,
+	}
 	statementXgamma := &zkproofs.EncStatement{
-	    EC: round.Params().EC(),
-	    N0: paillierPK.N,
-	    K: Xgamma,
+		EC: round.Params().EC(),
+		N0: paillierPK.N,
+		K:  Xgamma,
 	}
 
 	// Xkgamma = Xk^gamma rhoxkgamma^N  mod N2
 	// C = Y^gamma * rhoxkgamma^N mod N2
 	Xkgamma, rhoxkgamma, err := paillierPK.HomoMultAndReturnRandomness(gamma, Xk)
 	if err != nil {
-        return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
+		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
 	}
 	witnessXkgamma := &zkproofs.MulWitness{
-	    X: gamma,
-	    Rho: rhoxkgamma,
-	    Rhox: rhoxgamma,
+		X:    gamma,
+		Rho:  rhoxkgamma,
+		Rhox: rhoxgamma,
 	}
 	statementXkgamma := &zkproofs.MulStatement{
-	    N: paillierPK.N,
-	    X: Xgamma,
-	    Y: Xk,
-	    C: Xkgamma,
+		N: paillierPK.N,
+		X: Xgamma,
+		Y: Xk,
+		C: Xkgamma,
 	}
 
 	bigW := round.temp.bigWs[round.PartyID().Index]
-//	kw := common.ModInt(q).Mul(k, round.temp.w)
+	//	kw := common.ModInt(q).Mul(k, round.temp.w)
 	Xkw, rhokw, err := paillierPK.HomoMultAndReturnRandomness(round.temp.w, Xk)
 	if err != nil {
-        return round.WrapError(fmt.Errorf("failed to get init round1"))
+		return round.WrapError(fmt.Errorf("failed to get init round1"))
 	}
-    // C = Encrypt(k)
-    // X = bigW = g^w
+	// C = Encrypt(k)
+	// X = bigW = g^w
 	// D = C^x rho^N0 mod N02
 	// Xkw = Xk^w rho^N mod N2
-    witnessXkw := &zkproofs.MulStarWitness{
-        X: round.temp.w,
-        Rho: rhokw,
-    }
-    statementXkw := &zkproofs.MulStarStatement{
-        Ell: zkproofs.GetEll(round.Params().EC()),
-        N0: paillierPK.N,
-        C: Xk,
-        D: Xkw,
-        X: bigW,
-    }
+	witnessXkw := &zkproofs.MulStarWitness{
+		X:   round.temp.w,
+		Rho: rhokw,
+	}
+	statementXkw := &zkproofs.MulStarStatement{
+		Ell: zkproofs.GetEll(round.Params().EC()),
+		N0:  paillierPK.N,
+		C:   Xk,
+		D:   Xkw,
+		X:   bigW,
+	}
 
-    // save data for later in round.temp (todo)
+	// save data for later in round.temp (todo)
 
 	pointGamma := crypto.ScalarBaseMult(round.Params().EC(), gamma)
-//	cmt := commitments.NewHashCommitment(pointGamma.X(), pointGamma.Y())
+	//	cmt := commitments.NewHashCommitment(pointGamma.X(), pointGamma.Y())
 	round.temp.k = k
 	round.temp.gamma = gamma
 	round.temp.pointGamma = pointGamma
-//	round.temp.deCommit = cmt.D
+	//	round.temp.deCommit = cmt.D
 
 	i := round.PartyID().Index
 	round.ok[i] = true
 
-// messages for individual participants
-// share conversion and zkproofs using verifier Ring Pedersen parameters
+	// messages for individual participants
+	// share conversion and zkproofs using verifier Ring Pedersen parameters
 	for j, Pj := range round.Parties().IDs() {
 		if j == i {
 			continue
 		}
 		ringPedersenJ := round.key.GetRingPedersen(j)
 		cA, proofAlice, err := accmta.AliceInit(
-		    round.Params().EC(),
-            round.key.PaillierPKs[i],
-            k,
-            ringPedersenJ,
+			round.Params().EC(),
+			round.key.PaillierPKs[i],
+			k,
+			ringPedersenJ,
 		)
 		if err != nil {
 			return round.WrapError(fmt.Errorf("failed to init mta: %v", err))
@@ -159,16 +158,16 @@ func (round *round1) Start() *tss.Error {
 		}
 		proofXkw := zkproofs.NewMulStarProof(witnessXkw, statementXkw, ringPedersenJ)
 		r1msg1 := NewSignRound1Message1(
-		    Pj, round.PartyID(),
-		    cA, proofAlice,
-		    proofXk, proofXgamma, proofXkw,
+			Pj, round.PartyID(),
+			cA, proofAlice,
+			proofXk, proofXgamma, proofXkw,
 		)
 		round.temp.cis[j] = cA
 		round.out <- r1msg1
 	}
 
 	// broadcast
-	proofXkgamma :=zkproofs.NewMulProof(witnessXkgamma, statementXkgamma)
+	proofXkgamma := zkproofs.NewMulProof(witnessXkgamma, statementXkgamma)
 	r1msg2 := NewSignRound1Message2(round.PartyID(), Xk, Xgamma, Xkgamma, Xkw, proofXkgamma)
 	round.temp.signRound1Message2s[i] = r1msg2
 	round.out <- r1msg2

@@ -13,8 +13,8 @@ import (
 
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto"
-	cmt "github.com/bnb-chain/tss-lib/crypto/commitments"
 	"github.com/bnb-chain/tss-lib/crypto/accmta"
+	cmt "github.com/bnb-chain/tss-lib/crypto/commitments"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -66,7 +66,7 @@ type (
 		cis        []*big.Int
 		bigWs      []*crypto.ECPoint
 		pointGamma *crypto.ECPoint
-//		deCommit   cmt.HashDeCommitment
+		//		deCommit   cmt.HashDeCommitment
 
 		// round 2
 		betas, // return value of Bob_mid
@@ -202,22 +202,22 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 		p.temp.signRound1Message1s[fromPIdx] = msg
 	case *SignRound1Message2:
 		p.temp.signRound1Message2s[fromPIdx] = msg
-/*	case *SignRound2Message:
-		p.temp.signRound2Messages[fromPIdx] = msg
-	case *SignRound3Message:
-		p.temp.signRound3Messages[fromPIdx] = msg
-	case *SignRound4Message:
-		p.temp.signRound4Messages[fromPIdx] = msg
-	case *SignRound5Message:
-		p.temp.signRound5Messages[fromPIdx] = msg
-	case *SignRound6Message:
-		p.temp.signRound6Messages[fromPIdx] = msg
-	case *SignRound7Message:
-		p.temp.signRound7Messages[fromPIdx] = msg
-	case *SignRound8Message:
-		p.temp.signRound8Messages[fromPIdx] = msg
-	case *SignRound9Message:
-		p.temp.signRound9Messages[fromPIdx] = msg */
+		/*	case *SignRound2Message:
+				p.temp.signRound2Messages[fromPIdx] = msg
+			case *SignRound3Message:
+				p.temp.signRound3Messages[fromPIdx] = msg
+			case *SignRound4Message:
+				p.temp.signRound4Messages[fromPIdx] = msg
+			case *SignRound5Message:
+				p.temp.signRound5Messages[fromPIdx] = msg
+			case *SignRound6Message:
+				p.temp.signRound6Messages[fromPIdx] = msg
+			case *SignRound7Message:
+				p.temp.signRound7Messages[fromPIdx] = msg
+			case *SignRound8Message:
+				p.temp.signRound8Messages[fromPIdx] = msg
+			case *SignRound9Message:
+				p.temp.signRound9Messages[fromPIdx] = msg */
 	default: // unrecognised message, just ignore!
 		common.Logger.Warningf("unrecognised message ignored: %v", msg)
 		return false, nil

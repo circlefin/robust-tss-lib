@@ -15,14 +15,14 @@ var (
 	_ = []tss.MessageContent{
 		(*SignRound1Message1)(nil),
 		(*SignRound1Message2)(nil),
-/*		(*SignRound2Message)(nil),
-		(*SignRound3Message)(nil),
-		(*SignRound4Message)(nil),
-		(*SignRound5Message)(nil),
-		(*SignRound6Message)(nil),
-		(*SignRound7Message)(nil),
-		(*SignRound8Message)(nil),
-		(*SignRound9Message)(nil),*/
+		/*		(*SignRound2Message)(nil),
+				(*SignRound3Message)(nil),
+				(*SignRound4Message)(nil),
+				(*SignRound5Message)(nil),
+				(*SignRound6Message)(nil),
+				(*SignRound7Message)(nil),
+				(*SignRound8Message)(nil),
+				(*SignRound9Message)(nil),*/
 	}
 )
 
@@ -44,11 +44,11 @@ func NewSignRound1Message1(
 	pXg := proofXgamma.Bytes()
 	pXkw := proofXkw.Bytes()
 	content := &SignRound1Message1{
-    	CA:              cA.Bytes(),
-    	RangeProofAlice: pa[:],
-    	ProofXK:            pXk[:],
-    	ProofXGamma:        pXg[:],
-    	ProofXKw:           pXkw[:],
+		CA:              cA.Bytes(),
+		RangeProofAlice: pa[:],
+		ProofXK:         pXk[:],
+		ProofXGamma:     pXg[:],
+		ProofXKw:        pXkw[:],
 	}
 	msg := tss.NewMessageWrapper(meta, content)
 	return tss.NewMessage(meta, content, msg)
@@ -83,9 +83,6 @@ func (m *SignRound1Message1) UnmarshalProofXKw(ec elliptic.Curve) (*zkproofs.Mul
 	return zkproofs.MulStarProofFromBytes(ec, m.GetProofXKw())
 }
 
-
-
-
 func NewSignRound1Message2(
 	from *tss.PartyID,
 	xk, xgamma, xkgamma, xkw *big.Int,
@@ -96,13 +93,13 @@ func NewSignRound1Message2(
 		IsBroadcast: true,
 	}
 	pXkg := proofXkgamma.Bytes()
-    content := &SignRound1Message2 {
-    	XK:  xk.Bytes(),
-    	XGamma: xgamma.Bytes(),
-    	XKgamma: xkgamma.Bytes(),
-    	XKw: xkw.Bytes(),
-    	ProofXKgamma:       pXkg[:],
-    }
+	content := &SignRound1Message2{
+		XK:           xk.Bytes(),
+		XGamma:       xgamma.Bytes(),
+		XKgamma:      xkgamma.Bytes(),
+		XKw:          xkw.Bytes(),
+		ProofXKgamma: pXkg[:],
+	}
 	msg := tss.NewMessageWrapper(meta, content)
 	return tss.NewMessage(meta, content, msg)
 }
@@ -136,7 +133,6 @@ func (m *SignRound1Message2) UnmarshalProofXKgamma() (*zkproofs.MulProof, error)
 	return zkproofs.MulProofFromBytes(m.GetProofXKgamma())
 }
 
-
 func NewSignRound2Message1(
 	to, from *tss.PartyID,
 	c_gamma, c_w *big.Int,
@@ -150,12 +146,12 @@ func NewSignRound2Message1(
 	}
 	pP := proofP.Bytes()
 	pDL := proofDL.Bytes()
-    content := &SignRound2Message1 {
-    	CGamma:  c_gamma.Bytes(),
-    	CW: c_w.Bytes(),
-    	ProofP: pP[:],
-    	ProofDl: pDL[:],
-    }
+	content := &SignRound2Message1{
+		CGamma:  c_gamma.Bytes(),
+		CW:      c_w.Bytes(),
+		ProofP:  pP[:],
+		ProofDl: pDL[:],
+	}
 	msg := tss.NewMessageWrapper(meta, content)
 	return tss.NewMessage(meta, content, msg)
 }

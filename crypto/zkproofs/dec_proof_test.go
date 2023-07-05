@@ -12,21 +12,21 @@ import (
 func TestDecProof(t *testing.T) {
 	setUp(t)
 
-    // witness
-    witness := &zkproofs.DecWitness{
-        Y: common.GetRandomPositiveInt(q),
-        Rho: common.GetRandomPositiveInt(q),
-    }
+	// witness
+	witness := &zkproofs.DecWitness{
+		Y:   common.GetRandomPositiveInt(q),
+		Rho: common.GetRandomPositiveInt(q),
+	}
 
 	// C = Encrypt(N0, k, rho)
 	C, err := publicKey.EncryptWithRandomness(witness.Y, witness.Rho)
 	assert.NoError(t, err, "encrypt C not error")
 	statement := &zkproofs.DecStatement{
-	    Q: q,
-	    Ell: ell,
-	    N0: publicKey.N,
-	    C: C,
-	    X: witness.Y,
+		Q:   q,
+		Ell: ell,
+		N0:  publicKey.N,
+		C:   C,
+		X:   witness.Y,
 	}
 
 	// Prove that:
@@ -41,21 +41,21 @@ func TestDecProof(t *testing.T) {
 func TestDecProofBytes(t *testing.T) {
 	setUp(t)
 
-    // witness
-    witness := &zkproofs.DecWitness{
-        Y: common.GetRandomPositiveInt(q),
-        Rho: common.GetRandomPositiveInt(q),
-    }
+	// witness
+	witness := &zkproofs.DecWitness{
+		Y:   common.GetRandomPositiveInt(q),
+		Rho: common.GetRandomPositiveInt(q),
+	}
 
 	// C = Encrypt(N0, k, rho)
 	C, err := publicKey.EncryptWithRandomness(witness.Y, witness.Rho)
 	assert.NoError(t, err, "encrypt C not error")
 	statement := &zkproofs.DecStatement{
-	    Q: q,
-	    Ell: ell,
-	    N0: publicKey.N,
-	    C: C,
-	    X: witness.Y,
+		Q:   q,
+		Ell: ell,
+		N0:  publicKey.N,
+		C:   C,
+		X:   witness.Y,
 	}
 
 	// Prove that:
@@ -72,5 +72,5 @@ func TestDecProofBytes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, newProof)
 	assert.False(t, newProof.Nil())
-	assert.True(t,newProof.Verify(statement, ringPedersen))
+	assert.True(t, newProof.Verify(statement, ringPedersen))
 }
