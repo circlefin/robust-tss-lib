@@ -76,21 +76,20 @@ func (preParams LocalPreParams) ValidateWithProof() bool {
 }
 
 func (LocalPartySaveData LocalPartySaveData) GetRingPedersen(partyIdIndex int) *zkproofs.RingPedersenParams {
-    return &zkproofs.RingPedersenParams{
-        N: LocalPartySaveData.NTildej[partyIdIndex],
-        S: LocalPartySaveData.H1j[partyIdIndex],
-        T: LocalPartySaveData.H2j[partyIdIndex],
-    }
+	return &zkproofs.RingPedersenParams{
+		N: LocalPartySaveData.NTildej[partyIdIndex],
+		S: LocalPartySaveData.H1j[partyIdIndex],
+		T: LocalPartySaveData.H2j[partyIdIndex],
+	}
 }
 
 func (LocalPartySaveData *LocalPartySaveData) RingPedersen() *zkproofs.RingPedersenParams {
-    return &zkproofs.RingPedersenParams{
-        N: LocalPartySaveData.NTildei,
-        S: LocalPartySaveData.H1i,
-        T: LocalPartySaveData.H2i,
-    }
+	return &zkproofs.RingPedersenParams{
+		N: LocalPartySaveData.NTildei,
+		S: LocalPartySaveData.H1i,
+		T: LocalPartySaveData.H2i,
+	}
 }
-
 
 // BuildLocalSaveDataSubset re-creates the LocalPartySaveData to contain data for only the list of signing parties.
 func BuildLocalSaveDataSubset(sourceData LocalPartySaveData, sortedIDs tss.SortedPartyIDs) LocalPartySaveData {
