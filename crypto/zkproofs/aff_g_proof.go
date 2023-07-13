@@ -233,7 +233,12 @@ func (proof *AffGProof) GetChallenge(stmt *AffGStatement, rp *RingPedersenParams
 	msg := []*big.Int{
 		ecParams.Gx, ecParams.Gy, ecParams.N,
 		stmt.Ell, stmt.EllPrime,
-		stmt.N0, stmt.N1, stmt.X.X(), stmt.X.Y(), stmt.Y, stmt.C, stmt.D,
+		stmt.N0, stmt.N1,
+		stmt.X.X(),
+		stmt.X.Y(),
+		stmt.Y,
+    stmt.C,
+        stmt.D, // todo: error in this line (likely decoding)
 		rp.N, rp.S, rp.T,
 		proof.A, proof.Bx.X(), proof.Bx.Y(), proof.By, proof.E, proof.S, proof.F, proof.T,
 	}
@@ -300,4 +305,47 @@ func AffGProofFromBytes(ec elliptic.Curve, bzs [][]byte) (*AffGProof, error) {
 		W:  new(big.Int).SetBytes(bzs[12]),
 		Wy: new(big.Int).SetBytes(bzs[13]),
 	}, nil
+}
+
+func AffGProofArrayToBytes(proofs []*AffGProof) [][]byte {
+    output := make([][]byte, AffGProofParts * len(proofs))
+    i := 0
+    for _, proof := range proofs {
+        if proof == nil {
+            for j := 0; j<AffGProofParts; j+=1 {
+                output[i] = nil
+                i += 1
+            }
+        } else {
+            pBytes := proof.Bytes()
+            for _, ppBytes := range pBytes {
+                output[i] = ppBytes
+                i += 1
+            }
+        }
+    }
+    return output
+}
+
+func AffGProofArrayFromBytes(ec elliptic.Curve, bzs [][]byte) ([]*AffGProof, error) {
+    if len(bzs) % AffGProofParts != 0 {
+        return nil, fmt.Errorf("Improper input length")
+    }
+
+    proofs := make([]*AffGProof, len(bzs) / AffGProofParts)
+    for p, _ := range proofs {
+        start := p * AffGProofParts
+        end := (p+1) * AffGProofParts
+        slice := bzs[start:end]
+        if common.NonEmptyMultiBytes(slice, len(slice)) {
+            proof, err := AffGProofFromBytes(ec, slice)
+            if err != nil {
+                return nil, err
+            }
+            proofs[p] = proof
+        } else {
+            proofs[p] = nil
+        }
+    }
+    return proofs, nil
 }

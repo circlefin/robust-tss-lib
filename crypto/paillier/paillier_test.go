@@ -47,7 +47,6 @@ func TestGenerateKeyPair(t *testing.T) {
 	setUp(t)
 	assert.NotZero(t, publicKey)
 	assert.NotZero(t, privateKey)
-	t.Log(privateKey)
 }
 
 func TestEncrypt(t *testing.T) {
@@ -55,7 +54,6 @@ func TestEncrypt(t *testing.T) {
 	cipher, err := publicKey.Encrypt(big.NewInt(1))
 	assert.NoError(t, err, "must not error")
 	assert.NotZero(t, cipher)
-	t.Log(cipher)
 }
 
 func TestEncryptDecrypt(t *testing.T) {
@@ -132,9 +130,22 @@ func TestHomoMulAndReturnRandomness(t *testing.T) {
 	// check randomness
 	N2 := new(big.Int).Mul(publicKey.N, publicKey.N)
 	rhoN := new(big.Int).Exp(rho, publicKey.N, N2)
-	expectedcm := new(big.Int).Mul(three, rhoN, N2)
+	eighteen, _ := publicKey.HomoMult(six, three)
+	expectedcm := common.ModInt(N2).Mul(eighteen, rhoN)
 	assert.Equal(t, 0, expectedcm.Cmp(cm))
 }
+
+func TestMultInv(t *testing.T) {
+ 	setUp(t)
+ 	num := big.NewInt(2343)
+ 	zero := big.NewInt(0)
+
+ 	cipher, _ := publicKey.Encrypt(num)
+ 	inv, _ := publicKey.HomoMultInv(cipher)
+ 	negNum, _ := privateKey.Decrypt(inv)
+ 	actual := common.ModInt(publicKey.N).Add(num, negNum)
+ 	assert.True(t, common.ModInt(publicKey.N).Congruent(zero, actual))
+ }
 
 func TestHomoAdd(t *testing.T) {
 	setUp(t)

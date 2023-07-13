@@ -60,12 +60,17 @@ func TestMTA_P(t *testing.T) {
 	setUp(t)
 
 	a := common.GetRandomPositiveInt(q)
+	ra := common.GetRandomPositiveInt(pkA.N)
+    Xk, err := pkA.EncryptWithRandomness(a, ra)
+    assert.NoError(t, err)
 	b := common.GetRandomPositiveInt(q)
 
-	cA, pf, err := accmta.AliceInit(ec, pkA, a, rpB)
+
+	cA, pf, err := accmta.AliceInit(ec, pkA, a, ra, rpB)
 	assert.NoError(t, err)
 	assert.NotNil(t, pf)
 	assert.NotNil(t, cA)
+	assert.Equal(t, 0, Xk.Cmp(cA))
 	statementA := &zkproofs.EncStatement{
 		K:  cA,    // Alice's ciphertext
 		N0: pkA.N, // Alice's public key
@@ -74,58 +79,74 @@ func TestMTA_P(t *testing.T) {
 	verify := pf.Verify(statementA, rpB)
 	assert.True(t, verify)
 
-	beta, cB, betaPrm, piB, err := accmta.BobRespondsP(ec, pkA, pkB, pf, b, cA, rpA, rpB)
+    rpVs := []*zkproofs.RingPedersenParams{rpA, rpA, nil, rpB}
+    cB, err := skB.Encrypt(b)
+    assert.NoError(t, err)
+	beta, cAlpha, cBetaPrm, proofs, err := accmta.BobRespondsP(ec, pkA, skB, pf, cB, cA, rpVs, rpB)
 	assert.NoError(t, err)
-	assert.NotNil(t, piB)
-	assert.NotNil(t, piB.X)
-	assert.NotNil(t, piB.Y)
+	assert.NotNil(t, beta)
+	assert.NotNil(t, cAlpha)
+	assert.NotNil(t, cBetaPrm)
+	assert.NotNil(t, cB)
+	assert.NotNil(t, proofs)
+	assert.Equal(t, len(rpVs), len(proofs))
 
-	alpha, err := accmta.AliceEndP(ec, skA, pkB, piB, cA, cB, rpA)
+    for i, _ := range rpVs {
+        if rpVs[i] != nil  {
+            assert.NotNil(t, proofs[i])
+        }
+        assert.True(t, accmta.AliceVerifyP(ec, &skA.PublicKey, pkB, proofs[i], cA, cAlpha, cBetaPrm, cB, rpVs[i]))
+    }
+	alpha, err := accmta.AliceEndP(ec, skA, pkB, proofs[0],  cA, cAlpha, cBetaPrm, cB, rpA)
 	assert.NotNil(t, alpha)
 	assert.NoError(t, err)
 
-	// expect: alpha = ab + betaPrm
-	right2 := new(big.Int).Mod(zkproofs.APlusBC(betaPrm, a, b), q)
-	assert.Equal(t, 0, alpha.Cmp(right2))
-
-	// expect alpha + beta = a*b
-	left1 := common.ModInt(q).Add(alpha, beta)
-	right1 := common.ModInt(q).Mul(a, b)
-	assert.Equal(t, 0, left1.Cmp(right1))
+	// expect: alpha + beta = ab
+	right := common.ModInt(q).Add(alpha, beta)
+	left := common.ModInt(q).Mul(a, b)
+	assert.Equal(t, 0, left.Cmp(right))
 }
 
 func TestMTA_DL(t *testing.T) {
 	setUp(t)
 
 	a := common.GetRandomPositiveInt(q)
+	ra := common.GetRandomPositiveInt(pkA.N)
+    Xk, err := pkA.EncryptWithRandomness(a, ra)
+    assert.NoError(t, err)
 	b := common.GetRandomPositiveInt(q)
 
-	cA, pf, err := accmta.AliceInit(ec, pkA, a, rpB)
+	cA, pf, err := accmta.AliceInit(ec, pkA, a, ra, rpB)
 	assert.NoError(t, err)
 	assert.NotNil(t, pf)
 	assert.NotNil(t, cA)
+	assert.Equal(t, 0, Xk.Cmp(cA))
 
+    rpVs := []*zkproofs.RingPedersenParams{rpA, rpA, nil, rpB}
 	B := crypto.ScalarBaseMult(ec, b)
 	assert.NoError(t, err)
-	beta, cB, betaPrm, piB, err := accmta.BobRespondsDL(ec, pkA, pkB, pf, b, cA, rpA, rpB, B)
+	beta, cAlpha, cBetaPrm, proofs, err := accmta.BobRespondsDL(ec, pkA, pkB, pf, b, cA, rpVs, rpB, B)
 	assert.NoError(t, err)
-	assert.NotNil(t, piB)
-	assert.NotNil(t, piB.Y)
+	assert.NotNil(t, beta)
+	assert.NotNil(t, cAlpha)
+	assert.NotNil(t, cBetaPrm)
+	assert.NotNil(t, proofs)
+	assert.Equal(t, len(rpVs), len(proofs))
 
-	alpha, err := accmta.AliceEndDL(ec, skA, pkB, piB, cA, cB, B, rpA)
+    for i, _ := range rpVs {
+        if rpVs[i] != nil  {
+            assert.NotNil(t, proofs[i])
+        }
+        assert.True(t, accmta.AliceVerifyDL(ec, &skA.PublicKey, pkB, proofs[i], cA, cAlpha, cBetaPrm, B, rpVs[i]))
+    }
+	alpha, err := accmta.AliceEndDL(ec, skA, pkB, proofs[0],  cA, cAlpha, cBetaPrm, B, rpA)
 	assert.NotNil(t, alpha)
 	assert.NoError(t, err)
 
-	// expect: alpha = ab + betaPrm
-	aTimesB := new(big.Int).Mul(a, b)
-	aTimesBPlusBeta := new(big.Int).Add(aTimesB, betaPrm)
-	aTimesBPlusBetaModQ := new(big.Int).Mod(aTimesBPlusBeta, q)
-	assert.Equal(t, 0, alpha.Cmp(aTimesBPlusBetaModQ))
-
-	// expect alpha + beta = a*b
-	left1 := common.ModInt(q).Add(alpha, beta)
-	right1 := common.ModInt(q).Mul(a, b)
-	assert.Equal(t, 0, left1.Cmp(right1))
+	// expect: alpha + beta = ab
+	right := common.ModInt(q).Add(alpha, beta)
+	left := common.ModInt(q).Mul(a, b)
+	assert.Equal(t, 0, left.Cmp(right))
 }
 
 func GenerateAffGData(t *testing.T) (*zkproofs.AffGWitness, *zkproofs.AffGStatement) {
@@ -206,7 +227,7 @@ func GenerateAffPData(t *testing.T) (*zkproofs.AffPWitness, *zkproofs.AffPStatem
 	}
 	return witness, statement
 }
-
+/*
 func TestBobProofPBytes(t *testing.T) {
 	setUp(t)
 	witness, statement := GenerateAffPData(t)
@@ -245,3 +266,4 @@ func TestBobProofDLBytes(t *testing.T) {
 	assert.Equal(t, statement.Y, newProof.Y)
 	assert.True(t, newProof.Proof.Verify(statement, rpA))
 }
+*/

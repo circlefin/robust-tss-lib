@@ -7,8 +7,8 @@ package accmta
 import (
 	"crypto/elliptic"
 	"errors"
-	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto"
@@ -16,32 +16,16 @@ import (
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 )
 
-const (
-	BobProofPParts  = zkproofs.AffPProofParts + 2
-	BobProofDLParts = zkproofs.AffGProofParts + 1
-)
-
-type BobProofP struct {
-	Proof *zkproofs.AffPProof
-	X     *big.Int
-	Y     *big.Int
-}
-
-type BobProofDL struct {
-	Proof *zkproofs.AffGProof
-	Y     *big.Int
-}
-
 func AliceInit(
 	ec elliptic.Curve,
 	// Alice public key
 	pkA *paillier.PublicKey,
 	// Alice secret
-	a *big.Int,
+	a, rA *big.Int,
 	// Bob's Ring Pedersen parameters
 	rpB *zkproofs.RingPedersenParams,
 ) (cA *big.Int, pf *zkproofs.EncProof, err error) {
-	cA, rA, err := pkA.EncryptAndReturnRandomness(a)
+    cA, err = pkA.EncryptWithRandomness(a, rA)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -76,18 +60,18 @@ func BobRespondsP(
 	// Alice's public key
 	pkA *paillier.PublicKey,
 	// Bob's public key
-	pkB *paillier.PublicKey,
+	skB *paillier.PrivateKey,
 	// Alice's proof
 	proofAlice *zkproofs.EncProof,
-	// Bob's secret
-	b *big.Int,
+	// Bob's encryption of his secret
+	cB,
 	// Alice's encryption of a under pkA
 	cA *big.Int,
-	// Alice's Ring Pedersen parameters
-	rpA *zkproofs.RingPedersenParams,
+	// Verifier Ring Pedersen parameters
+	rpV []*zkproofs.RingPedersenParams,
 	// Bob's Ring Pedersen parameters
 	rpB *zkproofs.RingPedersenParams,
-) (beta, cB, betaPrm *big.Int, piB *BobProofP, err error) {
+) (beta, cAlpha, cBetaPrm *big.Int, proofs []*zkproofs.AffPProof, err error) {
 	if !BobVerify(ec, pkA, proofAlice, cA, rpB) {
 		err = errors.New("RangeProofAlice.Verify() returned false")
 		return
@@ -96,17 +80,26 @@ func BobRespondsP(
 	// Compute response
 	// TODO: what is correct size for betaPrm? AffPProof Fig 26 needs
 	// it to be in 2^ell, but does share conversion require a bigger betaPrm?
-	betaPrm = common.GetRandomPositiveInt(ec.Params().N)
-	X, rhox, err := pkB.EncryptAndReturnRandomness(b)
-	Y, rhoy, err := pkB.EncryptAndReturnRandomness(betaPrm)
+	q := ec.Params().N
+	betaPrm := common.GetRandomPositiveInt(q)
+	beta = common.ModInt(q).Sub(big.NewInt(0), betaPrm)
+	b, rhox, err := skB.DecryptFull(cB)
 	if err != nil {
 		return
 	}
-	cB, err = pkA.HomoMult(b, cA)
+	cBetaPrm, rhoy, err := skB.PublicKey.EncryptAndReturnRandomness(betaPrm)
 	if err != nil {
 		return
 	}
-	cB, err = pkA.HomoAddInt(betaPrm, cB)
+
+	if err != nil {
+		return
+	}
+	cAlpha, err = pkA.HomoMult(b, cA)
+	if err != nil {
+		return
+	}
+	cAlpha, err = pkA.HomoAddInt(betaPrm, cAlpha)
 	if err != nil {
 		return
 	}
@@ -119,28 +112,33 @@ func BobRespondsP(
 	}
 	statement := &zkproofs.AffPStatement{
 		C:        cA,                  // Alice's ciphertext
-		D:        cB,                  // affine transform of Alice's ciphertext: cA(*)b + betaPrm
-		X:        X,                   // encryption of b using Bob's public key
-		Y:        Y,                   // encryption of betaPrm
+		D:        cAlpha,              // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+		X:        cB,                   // encryption of b using Bob's public key
+		Y:        cBetaPrm,                   // encryption of betaPrm
 		N0:       pkA.N,               // Alice's public key
-		N1:       pkB.N,               // Bob's public key
+		N1:       skB.PublicKey.N,               // Bob's public key
 		Ell:      zkproofs.GetEll(ec), // max size of plaintext
 		EllPrime: zkproofs.GetEll(ec), // max size of plaintext
 		EC:       ec,                  // elliptic curve
 	}
-	proof, err := zkproofs.NewAffPProof(witness, statement, rpA)
-	if err != nil {
-		return
+	wg := sync.WaitGroup{}
+	wg.Add(len(rpV))
+	proofs = make([]*zkproofs.AffPProof, len(rpV))
+	for i, rp := range rpV {
+		go func(i int, rp *zkproofs.RingPedersenParams) {
+			defer wg.Done()
+			if rp == nil {
+				proofs[i] = nil
+				return
+			}
+			proofs[i], err = zkproofs.NewAffPProof(witness, statement, rp)
+			if err != nil {
+				return
+			}
+		}(i, rp)
 	}
-	piB = &BobProofP{
-		Proof: proof,
-		X:     X,
-		Y:     Y,
-	}
+	wg.Wait()
 
-	// beta = -betaPrm mod q
-	q := ec.Params().N
-	beta = common.ModInt(q).Sub(big.NewInt(0), betaPrm)
 	return
 }
 
@@ -176,13 +174,13 @@ func BobRespondsDL(
 	b *big.Int,
 	// Alice's encryption of a under pkA
 	cA *big.Int,
-	// Alice's Ring Pedersen parameters
-	rpA *zkproofs.RingPedersenParams,
+	// Verifier's Ring Pedersen parameters
+	rpV []*zkproofs.RingPedersenParams,
 	// Bob's Ring Pedersen parameters
 	rpB *zkproofs.RingPedersenParams,
 	// DL commitment to Bob's input b
 	B *crypto.ECPoint,
-) (beta, cB, betaPrm *big.Int, piB *BobProofDL, err error) {
+) (beta, cAlpha, cBetaPrm *big.Int, proofs []*zkproofs.AffGProof, err error) {
 	if !BobVerify(ec, pkA, proofAlice, cA, rpB) {
 		err = errors.New("RangeProofAlice.Verify() returned false")
 		return
@@ -191,16 +189,18 @@ func BobRespondsDL(
 	// Compute response
 	// TODO: what is correct size for betaPrm? AffPProof Fig 26 needs
 	// it to be in 2^ell, but does share conversion require a bigger betaPrm?
-	betaPrm = common.GetRandomPositiveInt(ec.Params().N)
-	Y, rhoy, err := pkB.EncryptAndReturnRandomness(betaPrm)
+	q := ec.Params().N
+	betaPrm := common.GetRandomPositiveInt(q)
+	beta = common.ModInt(q).Sub(big.NewInt(0), betaPrm)
+	cBetaPrm, rhoy, err := pkB.EncryptAndReturnRandomness(betaPrm)
 	if err != nil {
 		return
 	}
-	cB, err = pkA.HomoMult(b, cA)
+	cAlpha, err = pkA.HomoMult(b, cA)
 	if err != nil {
 		return
 	}
-	cB, err = pkA.HomoAddInt(betaPrm, cB)
+	cAlpha, err = pkA.HomoAddInt(betaPrm, cAlpha)
 	if err != nil {
 		return
 	}
@@ -212,33 +212,34 @@ func BobRespondsDL(
 	}
 	statement := &zkproofs.AffGStatement{
 		C:        cA,                  // Alice's ciphertext
-		D:        cB,                  // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+		D:        cAlpha,                  // affine transform of Alice's ciphertext: cA(*)b + betaPrm
 		X:        B,                   // B = g^b is a DL commitment to Bob's input b
-		Y:        Y,                   // encryption of betaPrm
+		Y:        cBetaPrm,                   // encryption of betaPrm
 		N0:       pkA.N,               // Alice's public key
 		N1:       pkB.N,               // Bob's public key
 		Ell:      zkproofs.GetEll(ec), // max size of plaintext
 		EllPrime: zkproofs.GetEll(ec), // max size of plaintext
 	}
 
-	proof, err := zkproofs.NewAffGProof(witness, statement, rpA)
-	if err != nil {
-		return
+	wg := sync.WaitGroup{}
+	wg.Add(len(rpV))
+	proofs = make([]*zkproofs.AffGProof, len(rpV))
+	for i, rp := range rpV {
+		go func(i int, rp *zkproofs.RingPedersenParams) {
+			defer wg.Done()
+			if rp == nil {
+				proofs[i] = nil
+				return
+			}
+			proof, err := zkproofs.NewAffGProof(witness, statement, rp)
+			if err != nil {
+				return
+			}
+			proofs[i] = proof
+		}(i, rp)
 	}
-	piB = &BobProofDL{
-		Proof: proof,
-		Y:     Y,
-	}
-	if piB == nil {
-		err = errors.New("piB nil")
-		return
-	}
-
-	// beta = -betaPrm mod q
-	// beta = -betaPrm mod q
-	q := ec.Params().N
-	beta = common.ModInt(q).Sub(big.NewInt(0), betaPrm)
-	return
+    wg.Wait()
+    return
 }
 
 func AliceEndP(
@@ -248,33 +249,56 @@ func AliceEndP(
 	// Bob's Paillier keys
 	pkB *paillier.PublicKey,
 	// Bob's proof
-	proof *BobProofP,
+	proof *zkproofs.AffPProof,
 	// Statement
-	cA, cB *big.Int,
+	cA, cAlpha, cBetaPrm, cB *big.Int,
 	// Alice's Ring Pedersen parameters
 	rpA *zkproofs.RingPedersenParams,
 ) (*big.Int, error) {
-	statement := &zkproofs.AffPStatement{
-		C:        cA,                  // Alice's ciphertext
-		D:        cB,                  // affine transform of Alice's ciphertext: cA(*)b + betaPrm
-		X:        proof.X,             // encryption of b using Bob's public key
-		Y:        proof.Y,             // encryption of betaPrm
-		N0:       skA.PublicKey.N,     // Alice's public key
-		N1:       pkB.N,               // Bob's public key
-		Ell:      zkproofs.GetEll(ec), // max size of plaintext
-		EllPrime: zkproofs.GetEll(ec), // max size of plaintext
-		EC:       ec,                  // elliptic curve
-	}
-	if !proof.Proof.Verify(statement, rpA) {
+    if ! AliceVerifyP(ec, &skA.PublicKey, pkB, proof, cA, cAlpha, cBetaPrm, cB, rpA) {
 		return nil, errors.New("AffPProof.Verify() returned false")
 	}
-	alphaPrm, err := skA.Decrypt(cB)
+	alphaPrm, err := skA.Decrypt(cAlpha)
 	if err != nil {
 		return nil, err
 	}
 	q := ec.Params().N
 	return new(big.Int).Mod(alphaPrm, q), nil
 }
+
+func AliceVerifyP(
+	ec elliptic.Curve,
+	// Alice's Paillier keys
+	pkA *paillier.PublicKey,
+	// Bob's Paillier keys
+	pkB *paillier.PublicKey,
+	// Bob's proof
+	proof *zkproofs.AffPProof,
+	// Statement
+	cA, cAlpha, cBetaPrm, cB *big.Int,
+	// Verifier's Ring Pedersen parameters
+	rpV *zkproofs.RingPedersenParams,
+) bool {
+    if rpV == nil {
+        return true
+    }
+	statement := &zkproofs.AffPStatement{
+		C:        cA,                  // Alice's ciphertext
+		D:        cAlpha,              // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+		X:        cB,                  // encryption of b using Bob's public key
+		Y:        cBetaPrm,            // encryption of betaPrm
+		N0:       pkA.N,               // Alice's public key
+		N1:       pkB.N,               // Bob's public key
+		Ell:      zkproofs.GetEll(ec), // max size of plaintext
+		EllPrime: zkproofs.GetEll(ec), // max size of plaintext
+		EC:       ec,                  // elliptic curve
+	}
+	if !proof.Verify(statement, rpV) {
+		return false
+	}
+	return true
+}
+
 
 func AliceEndDL(
 	ec elliptic.Curve,
@@ -283,27 +307,17 @@ func AliceEndDL(
 	// Bob's Paillier keys
 	pkB *paillier.PublicKey,
 	// Bob's proof
-	proof *BobProofDL,
+	proof *zkproofs.AffGProof,
 	// Statement
-	cA, cB *big.Int,
+	cA, cAlpha, cBetaPrm *big.Int,
 	B *crypto.ECPoint,
 	// Alice's Ring Pedersen parameters
 	rpA *zkproofs.RingPedersenParams,
 ) (*big.Int, error) {
-	statement := &zkproofs.AffGStatement{
-		C:        cA,                  // Alice's ciphertext
-		D:        cB,                  // affine transform of Alice's ciphertext: cA(*)b + betaPrm
-		X:        B,                   // B = g^b is a DL commitment to Bob's input b
-		Y:        proof.Y,             // encryption of betaPrm
-		N0:       skA.PublicKey.N,     // Alice's public key
-		N1:       pkB.N,               // Bob's public key
-		Ell:      zkproofs.GetEll(ec), // max size of plaintext
-		EllPrime: zkproofs.GetEll(ec), // max size of plaintext
-	}
-	if !proof.Proof.Verify(statement, rpA) {
+    if ! AliceVerifyDL(ec, &skA.PublicKey, pkB, proof, cA, cAlpha, cBetaPrm, B, rpA) {
 		return nil, errors.New("AffGProof.Verify() returned false")
 	}
-	alphaPrm, err := skA.Decrypt(cB)
+	alphaPrm, err := skA.Decrypt(cAlpha)
 	if err != nil {
 		return nil, err
 	}
@@ -311,6 +325,39 @@ func AliceEndDL(
 	return new(big.Int).Mod(alphaPrm, q), nil
 }
 
+func AliceVerifyDL(
+	ec elliptic.Curve,
+	// Alice's Paillier keys
+	pkA *paillier.PublicKey,
+	// Bob's Paillier keys
+	pkB *paillier.PublicKey,
+	// Bob's proof
+	proof *zkproofs.AffGProof,
+	// Statement
+	cA, cAlpha, cBetaPrm *big.Int,
+	B *crypto.ECPoint,
+	// Verifier's Ring Pedersen parameters
+	rpV *zkproofs.RingPedersenParams,
+) bool {
+    if rpV == nil {
+        return true
+    }
+	statement := &zkproofs.AffGStatement{
+		C:        cA,                  // Alice's ciphertext
+		D:        cAlpha,                  // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+		X:        B,                   // B = g^b is a DL commitment to Bob's input b
+		Y:        cBetaPrm,             // encryption of betaPrm
+		N0:       pkA.N,     // Alice's public key
+		N1:       pkB.N,               // Bob's public key
+		Ell:      zkproofs.GetEll(ec), // max size of plaintext
+		EllPrime: zkproofs.GetEll(ec), // max size of plaintext
+	}
+	if !proof.Verify(statement, rpV) {
+		return false
+	}
+	return true
+}
+/*
 func (proof *BobProofP) Bytes() [BobProofPParts][]byte {
 	proofBytes := proof.Proof.Bytes()
 	var output [BobProofPParts][]byte
@@ -370,3 +417,4 @@ func BobProofDLFromBytes(ec elliptic.Curve, bzs [][]byte) (*BobProofDL, error) {
 		Y:     new(big.Int).SetBytes(bzs[zkproofs.AffGProofParts]),
 	}, nil
 }
+*/

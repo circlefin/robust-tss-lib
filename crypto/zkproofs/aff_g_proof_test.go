@@ -76,3 +76,23 @@ func TestAffGProofBytes(t *testing.T) {
 	assert.False(t, newProof.Nil(), "proof has nil fields")
 	assert.True(t, newProof.Verify(statement, ringPedersen), "proof does not verify")
 }
+
+func TestAffGProofArrayBytes(t *testing.T) {
+	setUp(t)
+	witness, statement := GenerateAffGData(t)
+
+	proof, err := zkproofs.NewAffGProof(witness, statement, ringPedersen)
+    array := []*zkproofs.AffGProof{proof, proof, nil, proof}
+    bzs := zkproofs.AffGProofArrayToBytes(array)
+    out, err := zkproofs.AffGProofArrayFromBytes(ec, bzs)
+    assert.NoError(t, err)
+    assert.Equal(t, len(array), len(out))
+    assert.NotNil(t, out[0])
+    assert.NotNil(t, out[1])
+    assert.NotNil(t, out[3])
+    assert.True(t, out[0].Verify(statement, ringPedersen))
+    assert.True(t, out[1].Verify(statement, ringPedersen))
+    assert.Nil(t, out[2])
+    assert.True(t, out[3].Verify(statement, ringPedersen))
+}
+

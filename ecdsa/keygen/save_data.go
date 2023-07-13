@@ -75,19 +75,27 @@ func (preParams LocalPreParams) ValidateWithProof() bool {
 		preParams.Q != nil
 }
 
-func (LocalPartySaveData LocalPartySaveData) GetRingPedersen(partyIdIndex int) *zkproofs.RingPedersenParams {
+func (local LocalPartySaveData) GetRingPedersen(partyIdIndex int) *zkproofs.RingPedersenParams {
 	return &zkproofs.RingPedersenParams{
-		N: LocalPartySaveData.NTildej[partyIdIndex],
-		S: LocalPartySaveData.H1j[partyIdIndex],
-		T: LocalPartySaveData.H2j[partyIdIndex],
+		N: local.NTildej[partyIdIndex],
+		S: local.H1j[partyIdIndex],
+		T: local.H2j[partyIdIndex],
 	}
 }
 
-func (LocalPartySaveData *LocalPartySaveData) RingPedersen() *zkproofs.RingPedersenParams {
+func (local LocalPartySaveData) GetAllRingPedersen() []*zkproofs.RingPedersenParams {
+    rps := make([]*zkproofs.RingPedersenParams, len(local.NTildej))
+    for j, _ := range local.NTildej {
+        rps[j] = local.GetRingPedersen(j)
+	}
+	return rps
+}
+
+func (local *LocalPartySaveData) RingPedersen() *zkproofs.RingPedersenParams {
 	return &zkproofs.RingPedersenParams{
-		N: LocalPartySaveData.NTildei,
-		S: LocalPartySaveData.H1i,
-		T: LocalPartySaveData.H2i,
+		N: local.NTildei,
+		S: local.H1i,
+		T: local.H2i,
 	}
 }
 

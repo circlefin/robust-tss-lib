@@ -154,10 +154,19 @@ func (publicKey *PublicKey) HomoMultAndReturnRandomness(m, c1 *big.Int) (product
 	N2 := publicKey.NSquare()
 	// 2. x^N mod N2
 	x = common.GetRandomPositiveRelativelyPrimeInt(publicKey.N)
-	xN := new(big.Int).Exp(x, publicKey.N, N2)
+	xN := common.ModInt(N2).Exp(x, publicKey.N)
 	// 3. (ciphertext) * (2) mod N2
 	product = common.ModInt(N2).Mul(ciphertext, xN)
 	return
+}
+
+func (publicKey *PublicKey) HomoMultInv(c1 *big.Int) (*big.Int, error) {
+	N2 := publicKey.NSquare()
+	if c1.Cmp(zero) == -1 || c1.Cmp(N2) != -1 { // c1 < 0 || c1 >= N2 ?
+		return nil, ErrMessageTooLong
+	}
+	// cipher^m mod N2
+    return common.ModInt(N2).Exp(c1, big.NewInt(-1)), nil
 }
 
 func (publicKey *PublicKey) HomoAdd(c1, c2 *big.Int) (*big.Int, error) {

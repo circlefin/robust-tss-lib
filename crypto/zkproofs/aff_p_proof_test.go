@@ -98,3 +98,22 @@ func TestAffPProofBytes(t *testing.T) {
 	assert.Equal(t, 0, proof.Wx.Cmp(newProof.Wx))
 	assert.Equal(t, 0, proof.Wy.Cmp(newProof.Wy))
 }
+
+func TestAffPProofArrayBytes(t *testing.T) {
+	setUp(t)
+	witness, statement := GenerateAffPData(t)
+
+	proof, err := zkproofs.NewAffPProof(witness, statement, ringPedersen)
+    array := []*zkproofs.AffPProof{proof, proof, nil, proof}
+    bzs := zkproofs.AffPProofArrayToBytes(array)
+    out, err := zkproofs.AffPProofArrayFromBytes(bzs)
+    assert.NoError(t, err)
+    assert.Equal(t, len(array), len(out))
+    assert.NotNil(t, out[0])
+    assert.NotNil(t, out[1])
+    assert.NotNil(t, out[3])
+    assert.True(t, out[0].Verify(statement, ringPedersen))
+    assert.True(t, out[1].Verify(statement, ringPedersen))
+    assert.Nil(t, out[2])
+    assert.True(t, out[3].Verify(statement, ringPedersen))
+}

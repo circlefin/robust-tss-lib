@@ -13,8 +13,8 @@ import (
 
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto"
-	"github.com/bnb-chain/tss-lib/crypto/accmta"
 	cmt "github.com/bnb-chain/tss-lib/crypto/commitments"
+	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -54,27 +54,32 @@ type (
 	localTempData struct {
 		localMessageStore
 
-		// temp data (thrown away after sign) / round 1
+		// round 1
 		w,
 		m,
 		k,
-		theta,
-		thetaInverse,
-		sigma,
-		keyDerivationDelta,
 		gamma *big.Int
-		cis        []*big.Int
-		bigWs      []*crypto.ECPoint
+		Xgamma,
+		cA []*big.Int //[sender]
+		bigWs       []*crypto.ECPoint
 		pointGamma *crypto.ECPoint
+
 		//		deCommit   cmt.HashDeCommitment
 
 		// round 2
-		betas, // return value of Bob_mid
-		c1jis,
-		c2jis,
-		vs []*big.Int // return value of Bob_mid_wc
-		pi1jis []*accmta.BobProofP
-		pi2jis []*accmta.BobProofDL
+		beta, // return value of Bob_mid
+		nu,
+		cAlpha,
+		cBetaPrm,
+		cMu,
+		cNuPrm [][]*big.Int // return value of Bob_mid_wc
+		proofP  [][][]*zkproofs.AffPProof // [sender][receiver][verifier]
+		proofDL [][][]*zkproofs.AffGProof //[sender][receiver][verifier]
+
+		theta,
+		thetaInverse,
+		sigma,
+		keyDerivationDelta *big.Int
 
 		// round 5
 		li,
@@ -136,15 +141,36 @@ func NewLocalPartyWithKDD(
 	// temp data init
 	p.temp.keyDerivationDelta = keyDerivationDelta
 	p.temp.m = msg
-	p.temp.cis = make([]*big.Int, partyCount)
+
+	p.temp.Xgamma = make([]*big.Int, partyCount)
+	p.temp.cA = make([]*big.Int, partyCount)
 	p.temp.bigWs = make([]*crypto.ECPoint, partyCount)
-	p.temp.betas = make([]*big.Int, partyCount)
-	p.temp.c1jis = make([]*big.Int, partyCount)
-	p.temp.c2jis = make([]*big.Int, partyCount)
-	p.temp.pi1jis = make([]*accmta.BobProofP, partyCount)
-	p.temp.pi2jis = make([]*accmta.BobProofDL, partyCount)
-	p.temp.vs = make([]*big.Int, partyCount)
+	p.temp.beta = Make2DSlice[*big.Int](partyCount)
+	p.temp.nu = Make2DSlice[*big.Int](partyCount)
+	p.temp.cAlpha = Make2DSlice[*big.Int](partyCount)
+	p.temp.cBetaPrm = Make2DSlice[*big.Int](partyCount)
+	p.temp.cMu = Make2DSlice[*big.Int](partyCount)
+	p.temp.cNuPrm = Make2DSlice[*big.Int](partyCount)
+	p.temp.proofP = Make3DSlice[*zkproofs.AffPProof](partyCount)
+	p.temp.proofDL = Make3DSlice[*zkproofs.AffGProof](partyCount)
+
 	return p
+}
+
+func Make2DSlice[K *big.Int | *zkproofs.AffPProof | *zkproofs.AffGProof](dim int) [][]K {
+	out := make([][]K, dim)
+	for i, _ := range out {
+		out[i] = make([]K, dim)
+	}
+	return out
+}
+
+func Make3DSlice[K *zkproofs.AffPProof | *zkproofs.AffGProof](dim int) [][][]K {
+	out := make([][][]K, dim)
+	for i, _ := range out {
+		out[i] = Make2DSlice[K](dim)
+	}
+	return out
 }
 
 func (p *LocalParty) FirstRound() tss.Round {
@@ -202,9 +228,9 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 		p.temp.signRound1Message1s[fromPIdx] = msg
 	case *SignRound1Message2:
 		p.temp.signRound1Message2s[fromPIdx] = msg
-		/*	case *SignRound2Message:
-				p.temp.signRound2Messages[fromPIdx] = msg
-			case *SignRound3Message:
+	case *SignRound2Message:
+		p.temp.signRound2Messages[fromPIdx] = msg
+	/*		case *SignRound3Message:
 				p.temp.signRound3Messages[fromPIdx] = msg
 			case *SignRound4Message:
 				p.temp.signRound4Messages[fromPIdx] = msg
