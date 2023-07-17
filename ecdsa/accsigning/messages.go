@@ -15,14 +15,14 @@ var (
 	_ = []tss.MessageContent{
 		(*SignRound1Message1)(nil),
 		(*SignRound1Message2)(nil),
-		/*		(*SignRound2Message)(nil),
-				(*SignRound3Message)(nil),
-				(*SignRound4Message)(nil),
-				(*SignRound5Message)(nil),
-				(*SignRound6Message)(nil),
-				(*SignRound7Message)(nil),
-				(*SignRound8Message)(nil),
-				(*SignRound9Message)(nil),*/
+		(*SignRound2Message)(nil),
+		(*SignRound3Message)(nil),
+		/*(*SignRound4Message)(nil),
+		(*SignRound5Message)(nil),
+		(*SignRound6Message)(nil),
+		(*SignRound7Message)(nil),
+		(*SignRound8Message)(nil),
+		(*SignRound9Message)(nil),*/
 	}
 )
 
@@ -87,7 +87,7 @@ func NewSignRound1Message2(
 	}
 	pXkg := proofXkgamma.Bytes()
 	content := &SignRound1Message2{
-	    CA:           cA.Bytes(),
+		CA:           cA.Bytes(),
 		XGamma:       xgamma.Bytes(),
 		XKgamma:      xkgamma.Bytes(),
 		XKw:          xkw.Bytes(),
@@ -128,7 +128,7 @@ func (m *SignRound1Message2) UnmarshalProofXKgamma() (*zkproofs.MulProof, error)
 
 func NewSignRound2Message(
 	recipient, from *tss.PartyID,
-	cAlpha, cBetaPrm, cB, cMu, cNuPrm *big.Int,
+	cAlpha, cBetaPrm, cMu, cNuPrm *big.Int,
 	proofP []*zkproofs.AffPProof,
 	proofDL []*zkproofs.AffGProof,
 ) tss.ParsedMessage {
@@ -136,17 +136,16 @@ func NewSignRound2Message(
 		From:        from,
 		IsBroadcast: true,
 	}
-	pP := zkproofs.AffPProofArrayToBytes(proofP)
-	pDL := zkproofs.AffGProofArrayToBytes(proofDL)
+	pP := zkproofs.ProofArrayToBytes(proofP)
+	pDL := zkproofs.ProofArrayToBytes(proofDL)
 	content := &SignRound2Message{
-	    Recipient:  []byte(strconv.Itoa(recipient.Index)),
-	    CAlpha: cAlpha.Bytes(),
-	    CBetaPrm: cBetaPrm.Bytes(),
-	    CB: cB.Bytes(),
-	    CMu: cMu.Bytes(),
-		CNuPrm:  cNuPrm.Bytes(),
-		ProofP:  pP[:],
-		ProofDl: pDL[:],
+		Recipient: []byte(strconv.Itoa(recipient.Index)),
+		CAlpha:    cAlpha.Bytes(),
+		CBetaPrm:  cBetaPrm.Bytes(),
+		CMu:       cMu.Bytes(),
+		CNuPrm:    cNuPrm.Bytes(),
+		ProofP:    pP[:],
+		ProofDl:   pDL[:],
 	}
 	msg := tss.NewMessageWrapper(meta, content)
 	return tss.NewMessage(meta, content, msg)
@@ -157,7 +156,6 @@ func (m *SignRound2Message) ValidateBasic() bool {
 		common.NonEmptyBytes(m.GetRecipient()) &&
 		common.NonEmptyBytes(m.GetCAlpha()) &&
 		common.NonEmptyBytes(m.GetCBetaPrm()) &&
-		common.NonEmptyBytes(m.GetCB()) &&
 		common.NonEmptyBytes(m.GetCMu()) &&
 		common.NonEmptyBytes(m.GetCNuPrm())
 }
@@ -165,7 +163,7 @@ func (m *SignRound2Message) ValidateBasic() bool {
 func (m *SignRound2Message) UnmarshalRecipient() int {
 	x, err := strconv.Atoi(string(m.GetRecipient()))
 	if err != nil {
-	    return -1
+		return -1
 	}
 	return x
 }
@@ -178,10 +176,6 @@ func (m *SignRound2Message) UnmarshalCBetaPrm() *big.Int {
 	return new(big.Int).SetBytes(m.GetCBetaPrm())
 }
 
-func (m *SignRound2Message) UnmarshalCB() *big.Int {
-	return new(big.Int).SetBytes(m.GetCB())
-}
-
 func (m *SignRound2Message) UnmarshalCMu() *big.Int {
 	return new(big.Int).SetBytes(m.GetCMu())
 }
@@ -191,9 +185,40 @@ func (m *SignRound2Message) UnmarshalCNuPrm() *big.Int {
 }
 
 func (m *SignRound2Message) UnmarshalProofP() ([]*zkproofs.AffPProof, error) {
-	return zkproofs.AffPProofArrayFromBytes(m.GetProofP())
+	return zkproofs.ProofArrayFromBytes[*zkproofs.AffPProof](nil, m.GetProofP())
 }
 
 func (m *SignRound2Message) UnmarshalProofDL(ec elliptic.Curve) ([]*zkproofs.AffGProof, error) {
-	return zkproofs.AffGProofArrayFromBytes(ec, m.GetProofDl())
+	return zkproofs.ProofArrayFromBytes[*zkproofs.AffGProof](ec, m.GetProofDl())
+}
+
+func NewSignRound3Message(
+	from *tss.PartyID,
+	delta *big.Int,
+	proof []*zkproofs.DecProof,
+) tss.ParsedMessage {
+	meta := tss.MessageRouting{
+		From:        from,
+		IsBroadcast: true,
+	}
+	pP := zkproofs.ProofArrayToBytes(proof)
+	content := &SignRound3Message{
+		Delta: delta.Bytes(),
+		Proof: pP[:],
+	}
+	msg := tss.NewMessageWrapper(meta, content)
+	return tss.NewMessage(meta, content, msg)
+}
+
+func (m *SignRound3Message) ValidateBasic() bool {
+	return m != nil &&
+		common.NonEmptyBytes(m.GetDelta())
+}
+
+func (m *SignRound3Message) UnmarshalDelta() *big.Int {
+	return new(big.Int).SetBytes(m.GetDelta())
+}
+
+func (m *SignRound3Message) UnmarshalProof(ec elliptic.Curve) ([]*zkproofs.DecProof, error) {
+	return zkproofs.ProofArrayFromBytes[*zkproofs.DecProof](ec, m.GetProof())
 }

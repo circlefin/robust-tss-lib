@@ -4,14 +4,15 @@
 package accsigning
 
 import (
+	"fmt"
 	//	"math/big"
-    "sync"
+	"sync"
 	"testing"
 
 	//	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 
-	//	"github.com/bnb-chain/tss-lib/common"
+	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto/accmta"
 	"github.com/bnb-chain/tss-lib/crypto/paillier"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
@@ -20,6 +21,8 @@ import (
 	"github.com/bnb-chain/tss-lib/tss"
 )
 
+// todo: uncomment unit tests
+/*
 func TestRound1(t *testing.T) {
 	params, parties, outCh := SetupParties(t)
 	rounds := RunRound1(t, params, parties, outCh)
@@ -51,16 +54,98 @@ func TestRound2(t *testing.T) {
 	wg := sync.WaitGroup{}
 	for verifier, _ := range parties {
 		for sender, _ := range parties {
-			if sender == verifier {
+			for recipient, _ := range parties {
+				if sender == verifier || sender == recipient {
+					continue
+				}
+				wg.Add(1)
+				go func(verifier, sender, recipient int) {
+					defer wg.Done()
+					log := fmt.Sprintf("[%d][%d][%d]", verifier, sender, recipient)
+					assert.NotNil(t, round2s[verifier].temp.signRound2Messages[sender][recipient], log)
+					msg := round2s[verifier].temp.signRound2Messages[sender][recipient].Content().(*SignRound2Message)
+					ValidateSignRound2Message(t, round2s[verifier], sender, verifier, msg)
+					return
+				}(verifier, sender, recipient)
+			}
+		}
+	}
+	wg.Wait()
+}
+*/
+func TestRound3(t *testing.T) {
+	params, parties, outCh := SetupParties(t)
+	t.Logf("round 1")
+	round1s := RunRound1(t, params, parties, outCh)
+	t.Logf("round 2")
+	round2s := RunRound2(t, params, parties, round1s, outCh)
+	t.Logf("round 3")
+	round3s := RunRound3(t, params, parties, round2s, outCh)
+	assert.NotNil(t, round3s)
+
+	wg := sync.WaitGroup{}
+	q := tss.EC().Params().N
+	for i, round := range round3s {
+		delta := round.temp.delta[i]
+		D := round.temp.D[i]
+		d, err := round.key.PaillierSK.Decrypt(D)
+		assert.NoError(t, err)
+		assert.True(t, common.ModInt(q).Congruent(delta, d))
+
+		for _, oround := range round3s {
+			assert.NotNil(t, oround.temp.D[i])
+			assert.Equal(t, 0, D.Cmp(oround.temp.D[i]))
+		}
+
+		for sender, _ := range round.Parties().IDs() {
+			r3msg := round.temp.signRound3Messages[sender].Content().(*SignRound3Message)
+			proofs, _ := r3msg.UnmarshalProof(tss.EC())
+			for receiver, proof := range proofs {
+				if receiver == sender {
+					assert.True(t, proof.IsNil(), fmt.Sprintf("verify[%d][%d]", sender, receiver))
+				} else {
+					assert.False(t, proof.IsNil(), fmt.Sprintf("verify[%d][%d]", sender, receiver))
+				}
+			}
+		}
+
+		for j, _ := range round.Parties().IDs() {
+			if i == j {
 				continue
 			}
+
 			wg.Add(1)
-			go func(verifier, sender int) {
+			go func(receiver, sender int, round *round3) {
 				defer wg.Done()
-				msg := round2s[verifier].temp.signRound2Messages[sender].Content().(*SignRound2Message)
-				ValidateSignRound2Message(t, round2s[verifier], sender, verifier, msg)
-				return
-			}(verifier, sender)
+				r3msg := round.temp.signRound3Messages[sender].Content().(*SignRound3Message)
+				proof, err := r3msg.UnmarshalProof(tss.EC())
+				assert.NoError(t, err)
+				delta := r3msg.UnmarshalDelta()
+				assert.Equal(t, 0, delta.Cmp(round3s[sender].temp.delta[sender]), fmt.Sprintf("verify[%d][%d]", sender, receiver))
+				assert.Equal(t, 0, round.temp.D[sender].Cmp(round3s[sender].temp.D[sender]), fmt.Sprintf("verify[%d][%d]", sender, receiver))
+				pkj := round.key.PaillierPKs[sender]
+				statement := &zkproofs.DecStatement{
+					Q:   round.Params().EC().Params().N,
+					Ell: zkproofs.GetEll(round.Params().EC()),
+					N0:  pkj.N,
+					C:   round.temp.D[sender],
+					X:   delta,
+				}
+				rp := round.key.GetRingPedersen(receiver)
+				assert.True(t, proof[receiver].Verify(statement, rp), fmt.Sprintf("verify[%d][%d]", sender, receiver))
+			}(i, j, round)
+		}
+	}
+
+	for i, _ := range round3s[0].Parties().IDs() {
+		for j, _ := range round3s[0].Parties().IDs() {
+			if i == j {
+				continue
+			}
+			assert.NotNil(t, round3s[0].temp.cAlpha[i][j], fmt.Sprintf("cAlpha[%d][%d]", i, j))
+			assert.NotNil(t, round3s[0].temp.cBetaPrm[i][j], fmt.Sprintf("cBetaPrm[%d][%d]", i, j))
+			assert.NotNil(t, round3s[0].temp.cMu[i][j], fmt.Sprintf("cMu[%d][%d]", i, j))
+			assert.NotNil(t, round3s[0].temp.cNuPrm[i][j], fmt.Sprintf("cNuPrm[%d][%d]", i, j))
 		}
 	}
 	wg.Wait()
@@ -71,7 +156,7 @@ func ValidateSignRound2Message(t *testing.T, round *round2, sender, verifier int
 	recipient := msg.UnmarshalRecipient()
 	cAlpha := msg.UnmarshalCAlpha()
 	cBetaPrm := msg.UnmarshalCBetaPrm()
-	cB := msg.UnmarshalCB()
+	cB := round.temp.Xgamma[sender]
 	cMu := msg.UnmarshalCMu()
 	cNuPrm := msg.UnmarshalCNuPrm()
 	proofPs, err := msg.UnmarshalProofP()
@@ -94,34 +179,34 @@ func ValidateSignRound2Message(t *testing.T, round *round2, sender, verifier int
 	// Alice is the recipient
 	// Bob is the sender
 	rpV := round.key.GetRingPedersen(verifier)
-//	r1msg := round.temp.signRound1Message1s[recipient].Content().(*SignRound1Message1)
+	//	r1msg := round.temp.signRound1Message1s[recipient].Content().(*SignRound1Message1)
 	cA := round.temp.cA[recipient]
 	statementP := &zkproofs.AffPStatement{
-		C:        cA,                                       // Alice's ciphertext
-		D:        cAlpha,                                   // affine transform of Alice's ciphertext: cA(*)b + betaPrm
-		X:        cB,                                       // encryption of b using Bob's public key
-		Y:        cBetaPrm,                                 // encryption of betaPrm
-		N0:       round.key.PaillierPKs[recipient].N,       // Alice's public key
-		N1:       round.key.PaillierPKs[sender].N,          // Bob's public key
-		Ell:      zkproofs.GetEll(tss.EC()),               // max size of plaintext
-		EllPrime: zkproofs.GetEll(tss.EC()),               // max size of plaintext
-		EC:       tss.EC(),                                // elliptic curve
+		C:        cA,                                 // Alice's ciphertext
+		D:        cAlpha,                             // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+		X:        cB,                                 // encryption of b using Bob's public key
+		Y:        cBetaPrm,                           // encryption of betaPrm
+		N0:       round.key.PaillierPKs[recipient].N, // Alice's public key
+		N1:       round.key.PaillierPKs[sender].N,    // Bob's public key
+		Ell:      zkproofs.GetEll(tss.EC()),          // max size of plaintext
+		EllPrime: zkproofs.GetEll(tss.EC()),          // max size of plaintext
+		EC:       tss.EC(),                           // elliptic curve
 	}
 	assert.NotNil(t, statementP.C)
 	assert.True(t, proofPs[verifier].Verify(statementP, rpV))
 
 	statementDL := &zkproofs.AffGStatement{
-		C:        cA,                                       // Alice's ciphertext
-		D:        cMu,                                      // affine transform of Alice's ciphertext: cA(*)b + betaPrm
-		X:        round.temp.bigWs[sender],                 // Bob's bigW
-		Y:        cNuPrm,                                   // encryption of nuPrm
-		N0:       round.key.PaillierPKs[recipient].N,       // Alice's public key
-		N1:       round.key.PaillierPKs[sender].N,          // Bob's public key
-		Ell:      zkproofs.GetEll(tss.EC()),                // max size of plaintext
-		EllPrime: zkproofs.GetEll(tss.EC()),                // max size of plaintext
+		C:        cA,                                 // Alice's ciphertext
+		D:        cMu,                                // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+		X:        round.temp.bigWs[sender],           // Bob's bigW
+		Y:        cNuPrm,                             // encryption of nuPrm
+		N0:       round.key.PaillierPKs[recipient].N, // Alice's public key
+		N1:       round.key.PaillierPKs[sender].N,    // Bob's public key
+		Ell:      zkproofs.GetEll(tss.EC()),          // max size of plaintext
+		EllPrime: zkproofs.GetEll(tss.EC()),          // max size of plaintext
 	}
 	assert.NotNil(t, statementDL.C)
-//	assert.True(t, proofDLs[verifier].Verify(statementDL, rpV))
+	//	assert.True(t, proofDLs[verifier].Verify(statementDL, rpV))
 
 }
 

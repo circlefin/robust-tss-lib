@@ -2,11 +2,72 @@ package zkproofs
 
 import (
 	"crypto/elliptic"
+	"fmt"
 	"math/big"
 	"strconv"
 
 	"github.com/bnb-chain/tss-lib/common"
 )
+
+type Proof interface {
+	// returns true if nil
+	IsNil() bool
+	// returns byte encoding
+	Bytes() [][]byte
+	// length of Bytes() array
+	Parts() int
+	// decodes output of Bytes()
+	ProofFromBytes(ec elliptic.Curve, bzs [][]byte) (Proof, error)
+}
+
+func ProofArrayToBytes[P Proof](proofs []P) [][]byte {
+	if len(proofs) == 0 {
+		return nil
+	}
+	parts := proofs[0].Parts()
+	output := make([][]byte, parts*len(proofs))
+	i := 0
+	for _, proof := range proofs {
+		if proof.IsNil() {
+			for j := 0; j < parts; j += 1 {
+				output[i] = nil
+				i += 1
+			}
+		} else {
+			pBytes := proof.Bytes()
+			for _, ppBytes := range pBytes {
+				output[i] = ppBytes
+				i += 1
+			}
+		}
+	}
+	return output
+}
+
+func ProofArrayFromBytes[P Proof](ec elliptic.Curve, bzs [][]byte) ([]P, error) {
+	pp := make([]P, 1)[0]
+	parts := pp.Parts()
+	if len(bzs)%parts != 0 {
+		return nil, fmt.Errorf("Improper input length")
+	}
+
+	proofs := make([]P, len(bzs)/parts)
+	for p, _ := range proofs {
+		start := p * parts
+		end := (p + 1) * parts
+		slice := bzs[start:end]
+		if common.NonEmptyMultiBytes(slice, len(slice)) {
+			proof, err := pp.ProofFromBytes(ec, slice)
+			if err != nil {
+				return nil, err
+			}
+			proofs[p] = proof.(P)
+		} else {
+			// leave as nil
+		}
+	}
+	return proofs, nil
+}
 
 // Constants derived from an instance of elliptic.Curve
 type Ell struct {

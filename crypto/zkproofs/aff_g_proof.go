@@ -237,8 +237,8 @@ func (proof *AffGProof) GetChallenge(stmt *AffGStatement, rp *RingPedersenParams
 		stmt.X.X(),
 		stmt.X.Y(),
 		stmt.Y,
-    stmt.C,
-        stmt.D, // todo: error in this line (likely decoding)
+		stmt.C,
+		stmt.D, // todo: error in this line (likely decoding)
 		rp.N, rp.S, rp.T,
 		proof.A, proof.Bx.X(), proof.Bx.Y(), proof.By, proof.E, proof.S, proof.F, proof.T,
 	}
@@ -247,21 +247,16 @@ func (proof *AffGProof) GetChallenge(stmt *AffGStatement, rp *RingPedersenParams
 	return common.RejectionSample(q, e)
 }
 
-func (proof *AffGProof) Nil() bool {
-	if proof == nil {
-		return true
-	}
-	if proof.A == nil || proof.Bx == nil || proof.By == nil ||
-		proof.E == nil || proof.S == nil || proof.F == nil || proof.T == nil ||
-		proof.Z1 == nil || proof.Z2 == nil || proof.Z3 == nil || proof.Z4 == nil ||
-		proof.W == nil || proof.Wy == nil {
-		return true
-	}
-	return false
+func (proof *AffGProof) IsNil() bool {
+	return proof == nil
 }
 
-func (proof *AffGProof) Bytes() [AffGProofParts][]byte {
-	return [...][]byte{
+func (proof *AffGProof) Parts() int {
+	return AffGProofParts
+}
+
+func (proof *AffGProof) Bytes() [][]byte {
+	return [][]byte{
 		proof.A.Bytes(),
 		proof.Bx.X().Bytes(),
 		proof.Bx.Y().Bytes(),
@@ -279,7 +274,7 @@ func (proof *AffGProof) Bytes() [AffGProofParts][]byte {
 	}
 }
 
-func AffGProofFromBytes(ec elliptic.Curve, bzs [][]byte) (*AffGProof, error) {
+func (proof *AffGProof) ProofFromBytes(ec elliptic.Curve, bzs [][]byte) (Proof, error) {
 	if !common.NonEmptyMultiBytes(bzs, AffGProofParts) {
 		return nil, fmt.Errorf("expected %d byte parts to construct AffGProof", AffGProofParts)
 	}
@@ -305,47 +300,4 @@ func AffGProofFromBytes(ec elliptic.Curve, bzs [][]byte) (*AffGProof, error) {
 		W:  new(big.Int).SetBytes(bzs[12]),
 		Wy: new(big.Int).SetBytes(bzs[13]),
 	}, nil
-}
-
-func AffGProofArrayToBytes(proofs []*AffGProof) [][]byte {
-    output := make([][]byte, AffGProofParts * len(proofs))
-    i := 0
-    for _, proof := range proofs {
-        if proof == nil {
-            for j := 0; j<AffGProofParts; j+=1 {
-                output[i] = nil
-                i += 1
-            }
-        } else {
-            pBytes := proof.Bytes()
-            for _, ppBytes := range pBytes {
-                output[i] = ppBytes
-                i += 1
-            }
-        }
-    }
-    return output
-}
-
-func AffGProofArrayFromBytes(ec elliptic.Curve, bzs [][]byte) ([]*AffGProof, error) {
-    if len(bzs) % AffGProofParts != 0 {
-        return nil, fmt.Errorf("Improper input length")
-    }
-
-    proofs := make([]*AffGProof, len(bzs) / AffGProofParts)
-    for p, _ := range proofs {
-        start := p * AffGProofParts
-        end := (p+1) * AffGProofParts
-        slice := bzs[start:end]
-        if common.NonEmptyMultiBytes(slice, len(slice)) {
-            proof, err := AffGProofFromBytes(ec, slice)
-            if err != nil {
-                return nil, err
-            }
-            proofs[p] = proof
-        } else {
-            proofs[p] = nil
-        }
-    }
-    return proofs, nil
 }

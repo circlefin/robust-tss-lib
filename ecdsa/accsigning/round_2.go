@@ -10,7 +10,7 @@ import (
 	errorspkg "github.com/pkg/errors"
 
 	"github.com/bnb-chain/tss-lib/crypto/accmta"
-//	"github.com/bnb-chain/tss-lib/crypto/paillier"
+	//	"github.com/bnb-chain/tss-lib/crypto/paillier"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -34,11 +34,10 @@ func (round *round2) Start() *tss.Error {
 		}
 
 		wg.Add(3)
-		go round.Round2Verify(i, j, Pj, &wg, errChs)
-		go round.BobRespondsP(i, j, Pj, &wg, errChs)
-		go round.BobRespondsDL(i, j, Pj, &wg, errChs)
+		go round.Round2Verify(j, Pj, &wg, errChs)
+		go round.BobRespondsP(j, Pj, &wg, errChs)
+		go round.BobRespondsDL(j, Pj, &wg, errChs)
 	}
-	// consume error channels; wait for goroutines
 	wg.Wait()
 	close(errChs)
 	culprits := make([]*tss.PartyID, 0, len(round.Parties().IDs()))
@@ -57,7 +56,6 @@ func (round *round2) Start() *tss.Error {
 			Pj, round.PartyID(),
 			round.temp.cAlpha[i][j],
 			round.temp.cBetaPrm[i][j],
-			round.temp.Xgamma[i],
 			round.temp.cMu[i][j],
 			round.temp.cNuPrm[i][j],
 			round.temp.proofP[i][j], round.temp.proofDL[i][j])
@@ -66,8 +64,9 @@ func (round *round2) Start() *tss.Error {
 	return nil
 }
 
-func (round *round2) Round2Verify(i int, j int, Pj *tss.PartyID, wg *sync.WaitGroup, errChs chan *tss.Error) {
+func (round *round2) Round2Verify(j int, Pj *tss.PartyID, wg *sync.WaitGroup, errChs chan *tss.Error) {
 	defer wg.Done()
+	i := round.PartyID().Index
 
 	if round.temp.signRound1Message1s[j] == nil {
 		errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j))
@@ -96,8 +95,8 @@ func (round *round2) Round2Verify(i int, j int, Pj *tss.PartyID, wg *sync.WaitGr
 		errChs <- round.WrapError(fmt.Errorf("error parsing r1msg1[%d]", j))
 		return
 	}
-	Xgamma := r1msg2.UnmarshalXGamma()
-	Xkgamma := r1msg2.UnmarshalXKGamma()
+	round.temp.Xgamma[j] = r1msg2.UnmarshalXGamma()
+	round.temp.Xkgamma[j] = r1msg2.UnmarshalXKGamma()
 	Xkw := r1msg2.UnmarshalXKw()
 	rp := round.key.GetRingPedersen(i)
 
@@ -111,13 +110,13 @@ func (round *round2) Round2Verify(i int, j int, Pj *tss.PartyID, wg *sync.WaitGr
 	statementXgamma := &zkproofs.EncStatement{
 		EC: round.Params().EC(),
 		N0: paillierPK.N,
-		K:  Xgamma,
+		K:  round.temp.Xgamma[j],
 	}
 	statementXkgamma := &zkproofs.MulStatement{
 		N: paillierPK.N,
-		X: Xgamma,
+		X: round.temp.Xgamma[j],
 		Y: round.temp.cA[j],
-		C: Xkgamma,
+		C: round.temp.Xkgamma[j],
 	}
 	statementXkw := &zkproofs.MulStarStatement{
 		Ell: zkproofs.GetEll(round.Params().EC()),
@@ -137,8 +136,9 @@ func (round *round2) Round2Verify(i int, j int, Pj *tss.PartyID, wg *sync.WaitGr
 	return
 }
 
-func (round *round2) BobRespondsP(i int, j int, Pj *tss.PartyID, wg *sync.WaitGroup, errChs chan *tss.Error) {
+func (round *round2) BobRespondsP(j int, Pj *tss.PartyID, wg *sync.WaitGroup, errChs chan *tss.Error) {
 	defer wg.Done()
+	i := round.PartyID().Index
 	if round.temp.signRound1Message1s[j] == nil {
 		errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j))
 		return
@@ -175,7 +175,7 @@ func (round *round2) BobRespondsP(i int, j int, Pj *tss.PartyID, wg *sync.WaitGr
 	)
 
 	// should be thread safe as these are pre-allocated
-	round.temp.beta[i][j] = beta
+	round.temp.beta[j] = beta
 	round.temp.cAlpha[i][j] = cAlpha
 	round.temp.cBetaPrm[i][j] = cBetaPrm
 	round.temp.proofP[i][j] = proofs
@@ -185,8 +185,9 @@ func (round *round2) BobRespondsP(i int, j int, Pj *tss.PartyID, wg *sync.WaitGr
 }
 
 // BobRespondsDL on share k*w, Bob's secret is w
-func (round *round2) BobRespondsDL(i int, j int, Pj *tss.PartyID, wg *sync.WaitGroup, errChs chan *tss.Error) {
+func (round *round2) BobRespondsDL(j int, Pj *tss.PartyID, wg *sync.WaitGroup, errChs chan *tss.Error) {
 	defer wg.Done()
+	i := round.PartyID().Index
 	if round.temp.signRound1Message1s[j] == nil {
 		errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j))
 		return
@@ -223,7 +224,7 @@ func (round *round2) BobRespondsDL(i int, j int, Pj *tss.PartyID, wg *sync.WaitG
 		// DL commitment to Bob's input b
 		round.temp.bigWs[i],
 	)
-	round.temp.nu[i][j] = nu
+	round.temp.nu[j] = nu
 	round.temp.cMu[i][j] = cMu
 	round.temp.cNuPrm[i][j] = cNuPrm
 	round.temp.proofDL[i][j] = proofs
@@ -233,21 +234,26 @@ func (round *round2) BobRespondsDL(i int, j int, Pj *tss.PartyID, wg *sync.WaitG
 }
 
 func (round *round2) Update() (bool, *tss.Error) {
-	for j, msg := range round.temp.signRound2Messages {
-		if round.ok[j] {
-			continue
+	for i, msgArray := range round.temp.signRound2Messages {
+		for j, msg := range msgArray {
+			if i == j || i == round.PartyID().Index {
+				continue
+			}
+			if round.ok[j] {
+				continue
+			}
+			if msg == nil || !round.CanAccept(msg) {
+				return false, nil
+			}
 		}
-		if msg == nil || !round.CanAccept(msg) {
-			return false, nil
-		}
-		round.ok[j] = true
+		round.ok[i] = true
 	}
 	return true, nil
 }
 
 func (round *round2) CanAccept(msg tss.ParsedMessage) bool {
 	if _, ok := msg.Content().(*SignRound2Message); ok {
-		return !msg.IsBroadcast()
+		return msg.IsBroadcast()
 	}
 	return false
 }

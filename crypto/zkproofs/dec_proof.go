@@ -13,6 +13,7 @@
 package zkproofs
 
 import (
+	"crypto/elliptic"
 	"fmt"
 	"math/big"
 
@@ -159,8 +160,16 @@ func (proof *DecProof) Nil() bool {
 	return false
 }
 
-func (proof *DecProof) Bytes() [DecProofParts][]byte {
-	return [...][]byte{
+func (proof *DecProof) IsNil() bool {
+	return proof == nil
+}
+
+func (proof *DecProof) Parts() int {
+	return DecProofParts
+}
+
+func (proof *DecProof) Bytes() [][]byte {
+	return [][]byte{
 		proof.S.Bytes(),
 		proof.T.Bytes(),
 		proof.A.Bytes(),
@@ -171,7 +180,7 @@ func (proof *DecProof) Bytes() [DecProofParts][]byte {
 	}
 }
 
-func DecProofFromBytes(bzs [][]byte) (*DecProof, error) {
+func (proof *DecProof) ProofFromBytes(ec elliptic.Curve, bzs [][]byte) (Proof, error) {
 	if !common.NonEmptyMultiBytes(bzs, DecProofParts) {
 		return nil, fmt.Errorf("expected %d byte parts to construct DecProof", DecProofParts)
 	}

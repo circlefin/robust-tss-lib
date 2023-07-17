@@ -62,7 +62,7 @@ func TestAffPProof(t *testing.T) {
 	proof, err := zkproofs.NewAffPProof(witness, statement, ringPedersen)
 	assert.NoError(t, err)
 	assert.NotNil(t, proof)
-	assert.False(t, proof.Nil())
+	assert.False(t, proof.IsNil())
 	assert.True(t, proof.Verify(statement, ringPedersen), "proof failed to verify")
 }
 
@@ -73,15 +73,16 @@ func TestAffPProofBytes(t *testing.T) {
 	proof, err := zkproofs.NewAffPProof(witness, statement, ringPedersen)
 	assert.NoError(t, err)
 	assert.NotNil(t, proof)
-	assert.False(t, proof.Nil())
+	assert.False(t, proof.IsNil())
 	assert.True(t, proof.Verify(statement, ringPedersen), "proof failed to verify")
 
 	proofBytes := proof.Bytes()
 	var proofInBytes [][]byte = proofBytes[:]
-	newProof, err := zkproofs.AffPProofFromBytes(proofInBytes)
+	np, err := new(zkproofs.AffPProof).ProofFromBytes(ec, proofInBytes)
+	newProof := np.(*zkproofs.AffPProof)
 	assert.NoError(t, err, "could not create NewAffPProof")
 	assert.NotNil(t, newProof, "NewAffPProof nil")
-	assert.False(t, newProof.Nil(), "proof has nil fields")
+	assert.False(t, newProof.IsNil(), "proof has nil fields")
 	assert.True(t, newProof.Verify(statement, ringPedersen), "proof does not verify")
 	assert.Equal(t, 0, proof.A.Cmp(newProof.A))
 	assert.Equal(t, 0, proof.Bx.Cmp(newProof.Bx))
@@ -104,16 +105,16 @@ func TestAffPProofArrayBytes(t *testing.T) {
 	witness, statement := GenerateAffPData(t)
 
 	proof, err := zkproofs.NewAffPProof(witness, statement, ringPedersen)
-    array := []*zkproofs.AffPProof{proof, proof, nil, proof}
-    bzs := zkproofs.AffPProofArrayToBytes(array)
-    out, err := zkproofs.AffPProofArrayFromBytes(bzs)
-    assert.NoError(t, err)
-    assert.Equal(t, len(array), len(out))
-    assert.NotNil(t, out[0])
-    assert.NotNil(t, out[1])
-    assert.NotNil(t, out[3])
-    assert.True(t, out[0].Verify(statement, ringPedersen))
-    assert.True(t, out[1].Verify(statement, ringPedersen))
-    assert.Nil(t, out[2])
-    assert.True(t, out[3].Verify(statement, ringPedersen))
+	array := []*zkproofs.AffPProof{proof, proof, nil, proof}
+	bzs := zkproofs.ProofArrayToBytes(array)
+	out, err := zkproofs.ProofArrayFromBytes[*zkproofs.AffPProof](ec, bzs)
+	assert.NoError(t, err)
+	assert.Equal(t, len(array), len(out))
+	assert.NotNil(t, out[0])
+	assert.NotNil(t, out[1])
+	assert.NotNil(t, out[3])
+	assert.True(t, out[0].Verify(statement, ringPedersen))
+	assert.True(t, out[1].Verify(statement, ringPedersen))
+	assert.Nil(t, out[2])
+	assert.True(t, out[3].Verify(statement, ringPedersen))
 }

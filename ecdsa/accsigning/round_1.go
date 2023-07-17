@@ -129,9 +129,9 @@ func (round *round1) Start() *tss.Error {
 	round.temp.gamma = gamma
 	round.temp.pointGamma = pointGamma
 	round.temp.Xgamma[i] = Xgamma
+	round.temp.Xkgamma[i] = Xkgamma
 	round.temp.cA[i] = cA
 	//	round.temp.deCommit = cmt.D
-
 
 	// messages for individual participants
 	// share conversion and zkproofs using verifier Ring Pedersen parameters
@@ -165,7 +165,7 @@ func (round *round1) Start() *tss.Error {
 			proofXk, proofXgamma, proofXkw,
 		)
 		round.out <- r1msg1
-		if r1msg1.GetTo() == nil || len(r1msg1.GetTo())==0 {
+		if r1msg1.GetTo() == nil || len(r1msg1.GetTo()) == 0 {
 			return round.WrapError(fmt.Errorf("failed to set r1msg1.To"))
 		}
 	}

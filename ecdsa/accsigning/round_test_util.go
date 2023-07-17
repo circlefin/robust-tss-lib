@@ -82,22 +82,28 @@ func IsMessageType(msg tss.Message, expectedType string) bool {
 
 func AssertNoErrors(t *testing.T, errChs chan *tss.Error) {
 	for err := range errChs {
-	    t.Logf("%v", err)
-        assert.Nil(t, err)
+		t.Logf("%v", err)
+		AssertNoTssError(t, err)
+	}
+}
+
+func AssertNoTssError(t *testing.T, err *tss.Error) {
+	if err != nil {
+		assert.False(t, true, err.Error())
 	}
 }
 
 func DeliverMessages(t *testing.T, totalMessages int, parties []*LocalParty, outCh chan tss.Message) {
-	errChs := make(chan *tss.Error, (len(parties)*3))
+	errChs := make(chan *tss.Error, (len(parties) * 3))
 	for num := 0; num < totalMessages; num += 1 {
 		var msg tss.Message = <-outCh
 		dest := msg.GetTo()
-		if(dest == nil || len(dest) ==0) {
+		if dest == nil || len(dest) == 0 {
 			for recipient, _ := range parties {
 				test.SharedPartyUpdater(parties[recipient], msg, errChs)
 			}
 		} else {
-		    test.SharedPartyUpdater(parties[dest[0].Index], msg, errChs)
+			test.SharedPartyUpdater(parties[dest[0].Index], msg, errChs)
 		}
 	}
 	close(errChs)
@@ -110,7 +116,7 @@ func RunRound1(t *testing.T, params []*tss.Parameters, parties []*LocalParty, ou
 	for j, party := range parties {
 		wg.Add(1)
 		go func(j int, party *LocalParty) {
-		    defer wg.Done()
+			defer wg.Done()
 			partyParams := params[j]
 			rounds[j] = newRound1(partyParams, &party.keys, &party.data, &party.temp, party.out, party.end).(*round1)
 			err := rounds[j].prepare()
@@ -128,19 +134,19 @@ func RunRound1(t *testing.T, params []*tss.Parameters, parties []*LocalParty, ou
 }
 
 func RunRound2(t *testing.T, params []*tss.Parameters, parties []*LocalParty, round1s []*round1, outCh chan tss.Message) []*round2 {
-  	round2s := make([]*round2, len(parties))
-    for j, round1 := range round1s {
-        ok, tssErr := round1.Update()
-        assert.True(t, ok)
-        assert.Nil(t, tssErr)
-        round2s[j] = round1.NextRound().(*round2)
-    }
+	round2s := make([]*round2, len(parties))
+	for j, round1 := range round1s {
+		ok, tssErr := round1.Update()
+		assert.True(t, ok)
+		assert.Nil(t, tssErr)
+		round2s[j] = round1.NextRound().(*round2)
+	}
 
 	wg := sync.WaitGroup{}
 	for j, round := range round2s {
 		wg.Add(1)
 		go func(j int, round *round2) {
-		    defer wg.Done()
+			defer wg.Done()
 			tssError := round.Start()
 			assert.Nil(t, tssError)
 		}(j, round)
@@ -149,4 +155,28 @@ func RunRound2(t *testing.T, params []*tss.Parameters, parties []*LocalParty, ro
 	totalMessages := len(parties) * (len(parties) - 1)
 	DeliverMessages(t, totalMessages, parties, outCh)
 	return round2s
+}
+
+func RunRound3(t *testing.T, params []*tss.Parameters, parties []*LocalParty, round2s []*round2, outCh chan tss.Message) []*round3 {
+	round3s := make([]*round3, len(parties))
+	for j, round2 := range round2s {
+		ok, tssErr := round2.Update()
+		assert.True(t, ok)
+		assert.Nil(t, tssErr)
+		round3s[j] = round2.NextRound().(*round3)
+	}
+
+	wg := sync.WaitGroup{}
+	for j, round := range round3s {
+		wg.Add(1)
+		go func(j int, round *round3) {
+			defer wg.Done()
+			tssError := round.Start()
+			AssertNoTssError(t, tssError)
+		}(j, round)
+	}
+	wg.Wait()
+	totalMessages := len(parties)
+	DeliverMessages(t, totalMessages, parties, outCh)
+	return round3s
 }
