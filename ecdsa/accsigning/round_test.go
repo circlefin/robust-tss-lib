@@ -5,24 +5,20 @@ package accsigning
 
 import (
 	"fmt"
-	//	"math/big"
 	"sync"
 	"testing"
 
-	//	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto/accmta"
 	"github.com/bnb-chain/tss-lib/crypto/paillier"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
-	//	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
-	//	"github.com/bnb-chain/tss-lib/test"
 	"github.com/bnb-chain/tss-lib/tss"
 )
 
 // todo: uncomment unit tests
-/*
+
 func TestRound1(t *testing.T) {
 	params, parties, outCh := SetupParties(t)
 	rounds := RunRound1(t, params, parties, outCh)
@@ -48,8 +44,11 @@ func TestRound1(t *testing.T) {
 
 func TestRound2(t *testing.T) {
 	params, parties, outCh := SetupParties(t)
+	t.Logf("round 1")
 	round1s := RunRound1(t, params, parties, outCh)
-	round2s := RunRound2(t, params, parties, round1s, outCh)
+	t.Logf("round 2")
+	totalMessages := len(parties) * (len(parties) - 1)
+	round2s := RunRound[*round1, *round2](t, params, parties, round1s, totalMessages, outCh)
 
 	wg := sync.WaitGroup{}
 	for verifier, _ := range parties {
@@ -72,15 +71,16 @@ func TestRound2(t *testing.T) {
 	}
 	wg.Wait()
 }
-*/
+
 func TestRound3(t *testing.T) {
 	params, parties, outCh := SetupParties(t)
 	t.Logf("round 1")
 	round1s := RunRound1(t, params, parties, outCh)
 	t.Logf("round 2")
-	round2s := RunRound2(t, params, parties, round1s, outCh)
+	totalMessages := len(parties) * (len(parties) - 1)
+	round2s := RunRound[*round1, *round2](t, params, parties, round1s, totalMessages, outCh)
 	t.Logf("round 3")
-	round3s := RunRound3(t, params, parties, round2s, outCh)
+	round3s := RunRound[*round2, *round3](t, params, parties, round2s, len(parties), outCh)
 	assert.NotNil(t, round3s)
 
 	wg := sync.WaitGroup{}
@@ -146,6 +146,50 @@ func TestRound3(t *testing.T) {
 			assert.NotNil(t, round3s[0].temp.cBetaPrm[i][j], fmt.Sprintf("cBetaPrm[%d][%d]", i, j))
 			assert.NotNil(t, round3s[0].temp.cMu[i][j], fmt.Sprintf("cMu[%d][%d]", i, j))
 			assert.NotNil(t, round3s[0].temp.cNuPrm[i][j], fmt.Sprintf("cNuPrm[%d][%d]", i, j))
+		}
+	}
+	wg.Wait()
+}
+
+func TestRound4(t *testing.T) {
+	params, parties, outCh := SetupParties(t)
+	t.Logf("round 1")
+	round1s := RunRound1(t, params, parties, outCh)
+	t.Logf("round 2")
+	totalMessages := len(parties) * (len(parties) - 1)
+	round2s := RunRound[*round1, *round2](t, params, parties, round1s, totalMessages, outCh)
+	t.Logf("round 3")
+	round3s := RunRound[*round2, *round3](t, params, parties, round2s, len(parties), outCh)
+	t.Logf("round 4")
+	round4s := RunRound[*round3, *round4](t, params, parties, round3s, len(parties), outCh)
+
+	wg := sync.WaitGroup{}
+	for i, round := range round4s {
+		for j, _ := range round.Parties().IDs() {
+			if i == j {
+				continue
+			}
+
+			wg.Add(1)
+			go func(receiver, sender int, round *round4) {
+				defer wg.Done()
+				r4msg := round.temp.signRound4Messages[sender].Content().(*SignRound4Message)
+				proof, err := r4msg.UnmarshalProof(round.Params().EC())
+				assert.NoError(t, err)
+				Gamma, err := r4msg.UnmarshalGamma(round.Params().EC())
+				assert.NoError(t, err)
+				assert.True(t, Gamma.Equals(round4s[sender].temp.pointGamma[sender]), fmt.Sprintf("verify[%d][%d]", sender, receiver))
+				pkj := round.key.PaillierPKs[sender]
+				statement := &zkproofs.LogStarStatement{
+					Ell: zkproofs.GetEll(round.Params().EC()),
+					N0:  pkj.N,
+					C:   round.temp.Xgamma[sender],
+					X:   Gamma,
+				}
+				rp := round.key.GetRingPedersen(receiver)
+				assert.False(t, proof[receiver].IsNil())
+				assert.True(t, proof[receiver].Verify(statement, rp), fmt.Sprintf("verify[%d][%d]", sender, receiver))
+			}(i, j, round)
 		}
 	}
 	wg.Wait()

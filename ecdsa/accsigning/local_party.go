@@ -58,12 +58,12 @@ type (
 		w,
 		m,
 		k,
-		gamma *big.Int
+		gamma,
+		rhoxgamma *big.Int
 		Xgamma,
 		Xkgamma,
 		cA []*big.Int //[sender]
-		bigWs      []*crypto.ECPoint
-		pointGamma *crypto.ECPoint
+		bigWs []*crypto.ECPoint
 
 		//		deCommit   cmt.HashDeCommitment
 
@@ -83,9 +83,12 @@ type (
 		D,
 		alpha,
 		mu []*big.Int // [sender] -> self
-		theta,
-		thetaInverse,
 		keyDerivationDelta *big.Int
+
+		// round 4
+		finalDelta,
+		finalDeltaInv *big.Int
+		pointGamma []*crypto.ECPoint
 
 		// round 5
 		li,
@@ -165,6 +168,7 @@ func NewLocalPartyWithKDD(
 	p.temp.D = make([]*big.Int, partyCount)
 	p.temp.delta = make([]*big.Int, partyCount)
 	p.temp.sigma = make([]*big.Int, partyCount)
+	p.temp.pointGamma = make([]*crypto.ECPoint, partyCount)
 
 	return p
 }
@@ -254,9 +258,9 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 		p.temp.signRound2Messages[fromPIdx][toPIdx] = msg
 	case *SignRound3Message:
 		p.temp.signRound3Messages[fromPIdx] = msg
-	/*		case *SignRound4Message:
-				p.temp.signRound4Messages[fromPIdx] = msg
-			case *SignRound5Message:
+	case *SignRound4Message:
+		p.temp.signRound4Messages[fromPIdx] = msg
+	/*		case *SignRound5Message:
 				p.temp.signRound5Messages[fromPIdx] = msg
 			case *SignRound6Message:
 				p.temp.signRound6Messages[fromPIdx] = msg

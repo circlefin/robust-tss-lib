@@ -127,7 +127,8 @@ func (round *round1) Start() *tss.Error {
 	//	cmt := commitments.NewHashCommitment(pointGamma.X(), pointGamma.Y())
 	round.temp.k = k
 	round.temp.gamma = gamma
-	round.temp.pointGamma = pointGamma
+	round.temp.rhoxgamma = rhoxgamma
+	round.temp.pointGamma[i] = pointGamma
 	round.temp.Xgamma[i] = Xgamma
 	round.temp.Xkgamma[i] = Xkgamma
 	round.temp.cA[i] = cA

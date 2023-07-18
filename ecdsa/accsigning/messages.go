@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/bnb-chain/tss-lib/common"
+	"github.com/bnb-chain/tss-lib/crypto"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -17,8 +18,8 @@ var (
 		(*SignRound1Message2)(nil),
 		(*SignRound2Message)(nil),
 		(*SignRound3Message)(nil),
-		/*(*SignRound4Message)(nil),
-		(*SignRound5Message)(nil),
+		(*SignRound4Message)(nil),
+		/*(*SignRound5Message)(nil),
 		(*SignRound6Message)(nil),
 		(*SignRound7Message)(nil),
 		(*SignRound8Message)(nil),
@@ -221,4 +222,44 @@ func (m *SignRound3Message) UnmarshalDelta() *big.Int {
 
 func (m *SignRound3Message) UnmarshalProof(ec elliptic.Curve) ([]*zkproofs.DecProof, error) {
 	return zkproofs.ProofArrayFromBytes[*zkproofs.DecProof](ec, m.GetProof())
+}
+
+func NewSignRound4Message(
+	from *tss.PartyID,
+	Gamma *crypto.ECPoint,
+	proof []*zkproofs.LogStarProof,
+) tss.ParsedMessage {
+	meta := tss.MessageRouting{
+		From:        from,
+		IsBroadcast: true,
+	}
+	pP := zkproofs.ProofArrayToBytes(proof)
+	pGamma := [][]byte{Gamma.X().Bytes(), Gamma.Y().Bytes()}
+	content := &SignRound4Message{
+		Gamma: pGamma[:],
+		Proof: pP[:],
+	}
+	msg := tss.NewMessageWrapper(meta, content)
+	return tss.NewMessage(meta, content, msg)
+}
+
+func (m *SignRound4Message) ValidateBasic() bool {
+	return m != nil
+}
+
+func (m *SignRound4Message) UnmarshalGamma(ec elliptic.Curve) (*crypto.ECPoint, error) {
+	bzs := m.GetGamma()
+	Gamma, err := crypto.NewECPoint(
+		ec,
+		new(big.Int).SetBytes(bzs[0]),
+		new(big.Int).SetBytes(bzs[1]),
+	)
+	if err != nil {
+		return Gamma, err
+	}
+	return Gamma, nil
+}
+
+func (m *SignRound4Message) UnmarshalProof(ec elliptic.Curve) ([]*zkproofs.LogStarProof, error) {
+	return zkproofs.ProofArrayFromBytes[*zkproofs.LogStarProof](ec, m.GetProof())
 }

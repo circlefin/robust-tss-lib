@@ -57,3 +57,11 @@ message SignRound3Message {
     bytes delta = 1;
     repeated bytes proof = 2;
 }
+
+/*
+ * Represents a BROADCAST message sent to all parties during Round 3 of the Accountable ECDSA TSS signing protocol.
+ */
+message SignRound4Message {
+    repeated bytes gamma = 1;
+    repeated bytes proof = 2;
+}

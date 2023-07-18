@@ -167,7 +167,11 @@ func (proof *LogStarProof) GetChallenge(stmt *LogStarStatement, rp *RingPedersen
 	return e
 }
 
-func (proof *LogStarProof) Nil() bool {
+func (proof *LogStarProof) Parts() int {
+	return LogStarProofParts
+}
+
+func (proof *LogStarProof) IsNil() bool {
 	if proof == nil {
 		return true
 	}
@@ -177,8 +181,8 @@ func (proof *LogStarProof) Nil() bool {
 	return false
 }
 
-func (proof *LogStarProof) Bytes() [LogStarProofParts][]byte {
-	return [...][]byte{
+func (proof *LogStarProof) Bytes() [][]byte {
+	return [][]byte{
 		proof.S.Bytes(),
 		proof.A.Bytes(),
 		proof.Y.X().Bytes(),
@@ -190,7 +194,7 @@ func (proof *LogStarProof) Bytes() [LogStarProofParts][]byte {
 	}
 }
 
-func LogStarProofFromBytes(ec elliptic.Curve, bzs [][]byte) (*LogStarProof, error) {
+func (proof *LogStarProof) ProofFromBytes(ec elliptic.Curve, bzs [][]byte) (Proof, error) {
 	if !common.NonEmptyMultiBytes(bzs, LogStarProofParts) {
 		return nil, fmt.Errorf("expected %d byte parts to construct LogStarProof", LogStarProofParts)
 	}

@@ -133,50 +133,32 @@ func RunRound1(t *testing.T, params []*tss.Parameters, parties []*LocalParty, ou
 	return rounds
 }
 
-func RunRound2(t *testing.T, params []*tss.Parameters, parties []*LocalParty, round1s []*round1, outCh chan tss.Message) []*round2 {
-	round2s := make([]*round2, len(parties))
-	for j, round1 := range round1s {
-		ok, tssErr := round1.Update()
+func RunRound[InRound tss.Round, OutRound tss.Round](
+	t *testing.T,
+	params []*tss.Parameters,
+	parties []*LocalParty,
+	inrounds []InRound,
+	totalMessages int,
+	outCh chan tss.Message,
+) []OutRound {
+	outrounds := make([]OutRound, len(parties))
+	for j, round := range inrounds {
+		ok, tssErr := round.Update()
 		assert.True(t, ok)
 		assert.Nil(t, tssErr)
-		round2s[j] = round1.NextRound().(*round2)
+		outrounds[j] = round.NextRound().(OutRound)
 	}
 
 	wg := sync.WaitGroup{}
-	for j, round := range round2s {
+	for j, round := range outrounds {
 		wg.Add(1)
-		go func(j int, round *round2) {
-			defer wg.Done()
-			tssError := round.Start()
-			assert.Nil(t, tssError)
-		}(j, round)
-	}
-	wg.Wait()
-	totalMessages := len(parties) * (len(parties) - 1)
-	DeliverMessages(t, totalMessages, parties, outCh)
-	return round2s
-}
-
-func RunRound3(t *testing.T, params []*tss.Parameters, parties []*LocalParty, round2s []*round2, outCh chan tss.Message) []*round3 {
-	round3s := make([]*round3, len(parties))
-	for j, round2 := range round2s {
-		ok, tssErr := round2.Update()
-		assert.True(t, ok)
-		assert.Nil(t, tssErr)
-		round3s[j] = round2.NextRound().(*round3)
-	}
-
-	wg := sync.WaitGroup{}
-	for j, round := range round3s {
-		wg.Add(1)
-		go func(j int, round *round3) {
+		go func(j int, round OutRound) {
 			defer wg.Done()
 			tssError := round.Start()
 			AssertNoTssError(t, tssError)
 		}(j, round)
 	}
 	wg.Wait()
-	totalMessages := len(parties)
 	DeliverMessages(t, totalMessages, parties, outCh)
-	return round3s
+	return outrounds
 }
