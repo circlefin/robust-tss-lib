@@ -82,22 +82,29 @@ func TestMTA_P(t *testing.T) {
     rpVs := []*zkproofs.RingPedersenParams{rpA, rpA, nil, rpB}
     cB, err := skB.Encrypt(b)
     assert.NoError(t, err)
-	beta, cAlpha, cBetaPrm, proofs, err := accmta.BobRespondsP(ec, pkA, skB, pf, cB, cA, rpVs, rpB)
+	beta, cAlpha, cBeta, cBetaPrm, proofs, decProofs, err := accmta.BobRespondsP(ec, pkA, skB, pf, cB, cA, rpVs, rpB)
 	assert.NoError(t, err)
 	assert.NotNil(t, beta)
 	assert.NotNil(t, cAlpha)
 	assert.NotNil(t, cBetaPrm)
+	assert.NotNil(t, cBeta)
 	assert.NotNil(t, cB)
 	assert.NotNil(t, proofs)
+	assert.NotNil(t, decProofs)
 	assert.Equal(t, len(rpVs), len(proofs))
+
+	betaPrm, err := skB.Decrypt(cBetaPrm)
+	assert.NoError(t, err)
+	assert.True(t, common.ModInt(q).IsAdditiveInverse(beta, betaPrm))
 
     for i, _ := range rpVs {
         if rpVs[i] != nil  {
             assert.NotNil(t, proofs[i])
         }
         assert.True(t, accmta.AliceVerifyP(ec, &skA.PublicKey, pkB, proofs[i], cA, cAlpha, cBetaPrm, cB, rpVs[i]))
+        assert.True(t, accmta.DecProofVerify(pkB, ec, decProofs[i], cBeta, cBetaPrm, rpVs[i]))
     }
-	alpha, err := accmta.AliceEndP(ec, skA, pkB, proofs[0],  cA, cAlpha, cBetaPrm, cB, rpA)
+	alpha, err := accmta.AliceEndP(ec, skA, pkB, proofs[0], decProofs[0], cA, cAlpha, cBeta, cBetaPrm, cB, rpA)
 	assert.NotNil(t, alpha)
 	assert.NoError(t, err)
 
@@ -105,6 +112,40 @@ func TestMTA_P(t *testing.T) {
 	right := common.ModInt(q).Add(alpha, beta)
 	left := common.ModInt(q).Mul(a, b)
 	assert.Equal(t, 0, left.Cmp(right))
+}
+
+func TestDecTest(t *testing.T) {
+    setUp(t)
+    modQ := common.ModInt(q)
+    zero := big.NewInt(0)
+
+    betaPrm := common.GetRandomPositiveInt(q)
+    beta := modQ.Sub(zero, betaPrm)
+    assert.True(t, modQ.IsCongruent(zero, modQ.Add(beta, betaPrm)))
+
+    cBeta, _, _ := pkB.EncryptAndReturnRandomness(beta)
+    cBetaPrm, _, _ := pkB.EncryptAndReturnRandomness(betaPrm)
+    cZero, _ := pkB.HomoAdd(cBeta, cBetaPrm) // actually should be q
+    dZero, rho, _ := skB.DecryptFull(cZero)
+    assert.Equal(t, 0, dZero.Cmp(q))
+    assert.True(t, modQ.IsCongruent(dZero, zero))
+
+	decStatement := &zkproofs.DecStatement{
+	    Q: q,
+	    Ell: zkproofs.GetEll(tss.EC()),
+	    N0: pkB.N,
+	    C: cZero,
+	    X: zero,
+	}
+	decWitness := &zkproofs.DecWitness{
+        Y: q,
+        Rho: rho,
+	}
+	proof := zkproofs.NewDecProof(decWitness, decStatement, rpA)
+	assert.NotNil(t, proof)
+	assert.True(t, proof.Verify(decStatement, rpA))
+
+
 }
 
 func TestMTA_DL(t *testing.T) {
@@ -125,7 +166,7 @@ func TestMTA_DL(t *testing.T) {
     rpVs := []*zkproofs.RingPedersenParams{rpA, rpA, nil, rpB}
 	B := crypto.ScalarBaseMult(ec, b)
 	assert.NoError(t, err)
-	beta, cAlpha, cBetaPrm, proofs, err := accmta.BobRespondsDL(ec, pkA, pkB, pf, b, cA, rpVs, rpB, B)
+	beta, cAlpha, cBeta, cBetaPrm, proofs, decProofs, err := accmta.BobRespondsDL(ec, pkA, skB, pf, b, cA, rpVs, rpB, B)
 	assert.NoError(t, err)
 	assert.NotNil(t, beta)
 	assert.NotNil(t, cAlpha)
@@ -138,8 +179,9 @@ func TestMTA_DL(t *testing.T) {
             assert.NotNil(t, proofs[i])
         }
         assert.True(t, accmta.AliceVerifyDL(ec, &skA.PublicKey, pkB, proofs[i], cA, cAlpha, cBetaPrm, B, rpVs[i]))
+        assert.True(t, accmta.DecProofVerify(pkB, ec, decProofs[i], cBeta, cBetaPrm, rpVs[i]))
     }
-	alpha, err := accmta.AliceEndDL(ec, skA, pkB, proofs[0],  cA, cAlpha, cBetaPrm, B, rpA)
+	alpha, err := accmta.AliceEndDL(ec, skA, pkB, proofs[0], decProofs[0], cA, cAlpha, cBeta, cBetaPrm, B, rpA)
 	assert.NotNil(t, alpha)
 	assert.NoError(t, err)
 
@@ -227,43 +269,3 @@ func GenerateAffPData(t *testing.T) (*zkproofs.AffPWitness, *zkproofs.AffPStatem
 	}
 	return witness, statement
 }
-/*
-func TestBobProofPBytes(t *testing.T) {
-	setUp(t)
-	witness, statement := GenerateAffPData(t)
-	proof, err := zkproofs.NewAffPProof(witness, statement, rpA)
-	assert.NoError(t, err, "could not create NewAffGProof")
-	bobProof := &accmta.BobProofP{
-		Proof: proof,
-		X:     statement.X,
-		Y:     statement.Y,
-	}
-	bobProofBytes := bobProof.Bytes()
-	var proofInBytes [][]byte = bobProofBytes[:]
-	newProof, err := accmta.BobProofPFromBytes(proofInBytes)
-	assert.NoError(t, err, "could not create NewAffPProof")
-	assert.NotNil(t, newProof, "NewAffPProof nil")
-	assert.False(t, newProof.Proof.Nil(), "proof has nil fields")
-	assert.Equal(t, statement.Y, newProof.Y)
-	assert.True(t, newProof.Proof.Verify(statement, rpA))
-}
-
-func TestBobProofDLBytes(t *testing.T) {
-	setUp(t)
-	witness, statement := GenerateAffGData(t)
-	proof, err := zkproofs.NewAffGProof(witness, statement, rpA)
-	assert.NoError(t, err, "could not create NewAffGProof")
-	bobProof := &accmta.BobProofDL{
-		Proof: proof,
-		Y:     statement.Y,
-	}
-	bobProofBytes := bobProof.Bytes()
-	var proofInBytes [][]byte = bobProofBytes[:]
-	newProof, err := accmta.BobProofDLFromBytes(ec, proofInBytes)
-	assert.NoError(t, err, "could not create NewAffGProof")
-	assert.NotNil(t, newProof, "NewAffGProof nil")
-	assert.False(t, newProof.Proof.Nil(), "proof has nil fields")
-	assert.Equal(t, statement.Y, newProof.Y)
-	assert.True(t, newProof.Proof.Verify(statement, rpA))
-}
-*/

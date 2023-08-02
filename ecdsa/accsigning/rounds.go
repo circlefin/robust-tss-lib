@@ -7,6 +7,9 @@
 package accsigning
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
 	"github.com/bnb-chain/tss-lib/tss"
@@ -43,20 +46,8 @@ type (
 	round5 struct {
 		*round4
 	}
-	round6 struct {
-		*round5
-	}
-	round7 struct {
-		*round6
-	}
-	round8 struct {
-		*round7
-	}
-	round9 struct {
-		*round8
-	}
 	finalization struct {
-		*round9
+		*round5
 	}
 )
 
@@ -66,14 +57,24 @@ var (
 	_ tss.Round = (*round3)(nil)
 	_ tss.Round = (*round4)(nil)
 	_ tss.Round = (*round5)(nil)
-	_ tss.Round = (*round6)(nil)
-	_ tss.Round = (*round7)(nil)
-	_ tss.Round = (*round8)(nil)
-	_ tss.Round = (*round9)(nil)
 	_ tss.Round = (*finalization)(nil)
 )
 
 // ----- //
+
+func (round *base) WrapErrorChs(id *tss.PartyID, errChs chan *tss.Error, msg string) *tss.Error {
+	culprits := make([]*tss.PartyID, 0, len(round.Parties().IDs()))
+	length := len(errChs)
+	allMsgs := ""
+	for err := range errChs {
+		allMsgs = fmt.Sprintf("%s %s", allMsgs, err.Error())
+		culprits = append(culprits, err.Culprits()...)
+	}
+	if length > 0 {
+		return round.WrapError(errors.New(fmt.Sprintf("round [%d], party [%d], %s,%s", round.number, id.Index, msg, allMsgs)), culprits...)
+	}
+	return nil
+}
 
 func (round *base) Params() *tss.Parameters {
 	return round.Parameters

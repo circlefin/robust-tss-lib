@@ -119,10 +119,10 @@ func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 
 	// check (1+N0)^z1 * w^N0 mod N02 == A * C^e mod N02
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
-	pkN0 := &paillier.PublicKey{N: stmt.N0}
-	left1, err := pkN0.EncryptWithRandomness(proof.Z1, proof.W)
+	N0plus1 := new(big.Int).Add(stmt.N0, big.NewInt(1))
+    left1 := PseudoPaillierEncrypt(N0plus1, proof.Z1, proof.W, stmt.N0, N02)
 	right1 := ATimesBToTheCModN(proof.A, stmt.C, e, N02)
-	if err != nil || left1.Cmp(right1) != 0 {
+	if left1.Cmp(right1) != 0 {
 		return false
 	}
 
@@ -130,7 +130,7 @@ func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 	left2 := new(big.Int).Mod(proof.Z1, stmt.Q)
 	right2Int := APlusBC(proof.Gamma, e, stmt.X)
 	right2 := new(big.Int).Mod(right2Int, stmt.Q)
-	if err != nil || left2.Cmp(right2) != 0 {
+	if left2.Cmp(right2) != 0 {
 		return false
 	}
 
@@ -145,7 +145,13 @@ func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 }
 
 func (proof *DecProof) GetChallenge(stmt *DecStatement, rp *RingPedersenParams) *big.Int {
-	msg := []*big.Int{stmt.Ell, stmt.Q, stmt.N0, stmt.C, stmt.X, rp.N, rp.S, rp.T, proof.S, proof.T, proof.A, proof.Gamma}
+	msg := []*big.Int{
+	stmt.Ell, stmt.Q, stmt.N0,
+//	stmt.C,
+	stmt.X,
+//	rp.N, rp.S, rp.T,
+//	proof.S, proof.T, proof.A, proof.Gamma,
+	}
 	e := common.SHA512_256i(msg...)
 	return e
 }

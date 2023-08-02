@@ -13,7 +13,6 @@ import (
 
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto"
-	cmt "github.com/bnb-chain/tss-lib/crypto/commitments"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
 	"github.com/bnb-chain/tss-lib/tss"
@@ -62,6 +61,7 @@ type (
 		rhoxgamma *big.Int
 		Xgamma,
 		Xkgamma,
+		Xkw,
 		cA []*big.Int //[sender]
 		bigWs []*crypto.ECPoint
 
@@ -71,40 +71,36 @@ type (
 		beta,
 		nu []*big.Int // self -> [receiver]
 		cAlpha,
+		cBeta,
 		cBetaPrm,
 		cMu,
+		cNu,
 		cNuPrm [][]*big.Int // return value of Bob_mid_wc
-		proofP  [][][]*zkproofs.AffPProof // [sender][receiver][verifier]
-		proofDL [][][]*zkproofs.AffGProof //[sender][receiver][verifier]
+		proofP    [][][]*zkproofs.AffPProof // [sender][receiver][verifier]
+		proofDL   [][][]*zkproofs.AffGProof //[sender][receiver][verifier]
+		proofBeta [][][]*zkproofs.DecProof  // [sender][receiver][verifier]
+		proofNu   [][][]*zkproofs.DecProof  //[sender][receiver][verifier]
 
 		// round 3
 		delta,
-		sigma,
 		D,
 		alpha,
 		mu []*big.Int // [sender] -> self
 		keyDerivationDelta *big.Int
 
 		// round 4
+		d,
 		finalDelta,
 		finalDeltaInv *big.Int
 		pointGamma []*crypto.ECPoint
 
 		// round 5
-		li,
+		bigS []*big.Int
+		sigma,
 		si,
 		rx,
-		ry,
-		roi *big.Int
-		bigR,
-		bigAi,
-		bigVi *crypto.ECPoint
-		DPower cmt.HashDeCommitment
-
-		// round 7
-		Ui,
-		Ti *crypto.ECPoint
-		DTelda cmt.HashDeCommitment
+		ry *big.Int
+		bigR *crypto.ECPoint
 	}
 )
 
@@ -151,24 +147,29 @@ func NewLocalPartyWithKDD(
 	p.temp.keyDerivationDelta = keyDerivationDelta
 	p.temp.m = msg
 
+	p.temp.Xkw = make([]*big.Int, partyCount)
 	p.temp.Xgamma = make([]*big.Int, partyCount)
 	p.temp.Xkgamma = make([]*big.Int, partyCount)
 	p.temp.cA = make([]*big.Int, partyCount)
 	p.temp.bigWs = make([]*crypto.ECPoint, partyCount)
 	p.temp.cAlpha = Make2DSlice[*big.Int](partyCount)
+	p.temp.cBeta = Make2DSlice[*big.Int](partyCount)
 	p.temp.cBetaPrm = Make2DSlice[*big.Int](partyCount)
 	p.temp.cMu = Make2DSlice[*big.Int](partyCount)
+	p.temp.cNu = Make2DSlice[*big.Int](partyCount)
 	p.temp.cNuPrm = Make2DSlice[*big.Int](partyCount)
 	p.temp.proofP = Make3DSlice[*zkproofs.AffPProof](partyCount)
 	p.temp.proofDL = Make3DSlice[*zkproofs.AffGProof](partyCount)
+	p.temp.proofBeta = Make3DSlice[*zkproofs.DecProof](partyCount)
+	p.temp.proofNu = Make3DSlice[*zkproofs.DecProof](partyCount)
 	p.temp.alpha = make([]*big.Int, partyCount)
 	p.temp.beta = make([]*big.Int, partyCount)
 	p.temp.mu = make([]*big.Int, partyCount)
 	p.temp.nu = make([]*big.Int, partyCount)
 	p.temp.D = make([]*big.Int, partyCount)
 	p.temp.delta = make([]*big.Int, partyCount)
-	p.temp.sigma = make([]*big.Int, partyCount)
 	p.temp.pointGamma = make([]*crypto.ECPoint, partyCount)
+	p.temp.bigS = make([]*big.Int, partyCount)
 
 	return p
 }
@@ -181,7 +182,7 @@ func Make2DParsedMessage(dim int) [][]tss.ParsedMessage {
 	return out
 }
 
-func Make2DSlice[K *big.Int | *zkproofs.AffPProof | *zkproofs.AffGProof](dim int) [][]K {
+func Make2DSlice[K *big.Int | *zkproofs.AffPProof | *zkproofs.AffGProof | *zkproofs.DecProof](dim int) [][]K {
 	out := make([][]K, dim)
 	for i, _ := range out {
 		out[i] = make([]K, dim)
@@ -189,7 +190,7 @@ func Make2DSlice[K *big.Int | *zkproofs.AffPProof | *zkproofs.AffGProof](dim int
 	return out
 }
 
-func Make3DSlice[K *zkproofs.AffPProof | *zkproofs.AffGProof](dim int) [][][]K {
+func Make3DSlice[K *zkproofs.AffPProof | *zkproofs.AffGProof | *zkproofs.DecProof](dim int) [][][]K {
 	out := make([][][]K, dim)
 	for i, _ := range out {
 		out[i] = Make2DSlice[K](dim)
@@ -260,16 +261,16 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 		p.temp.signRound3Messages[fromPIdx] = msg
 	case *SignRound4Message:
 		p.temp.signRound4Messages[fromPIdx] = msg
-	/*		case *SignRound5Message:
-				p.temp.signRound5Messages[fromPIdx] = msg
-			case *SignRound6Message:
-				p.temp.signRound6Messages[fromPIdx] = msg
-			case *SignRound7Message:
-				p.temp.signRound7Messages[fromPIdx] = msg
-			case *SignRound8Message:
-				p.temp.signRound8Messages[fromPIdx] = msg
-			case *SignRound9Message:
-				p.temp.signRound9Messages[fromPIdx] = msg */
+	case *SignRound5Message:
+		p.temp.signRound5Messages[fromPIdx] = msg
+		/*			case *SignRound6Message:
+						p.temp.signRound6Messages[fromPIdx] = msg
+					case *SignRound7Message:
+						p.temp.signRound7Messages[fromPIdx] = msg
+					case *SignRound8Message:
+						p.temp.signRound8Messages[fromPIdx] = msg
+					case *SignRound9Message:
+						p.temp.signRound9Messages[fromPIdx] = msg */
 	default: // unrecognised message, just ignore!
 		common.Logger.Warningf("unrecognised message ignored: %v", msg)
 		return false, nil

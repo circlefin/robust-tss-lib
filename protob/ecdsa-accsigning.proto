@@ -43,11 +43,15 @@ message SignRound2Message1 {
 message SignRound2Message {
     bytes recipient = 1;
     bytes c_alpha = 2;
-    bytes c_beta_prm = 3;
-    bytes c_mu = 4;
-    bytes c_nu_prm = 5;
-    repeated bytes proof_p = 6;
-    repeated bytes proof_dl = 7;
+    bytes c_beta = 3;
+    bytes c_beta_prm = 4;
+    bytes c_mu = 5;
+    bytes c_nu = 6;
+    bytes c_nu_prm = 7;
+    repeated bytes proof_p = 8;
+    repeated bytes proof_dl = 9;
+    repeated bytes proof_beta = 10;
+    repeated bytes proof_nu = 11;
 }
 
 /*
@@ -55,13 +59,22 @@ message SignRound2Message {
  */
 message SignRound3Message {
     bytes delta = 1;
+    bytes d = 2;
+    repeated bytes proof = 3;
+}
+
+/*
+ * Represents a BROADCAST message sent to all parties during Round 4 of the Accountable ECDSA TSS signing protocol.
+ */
+message SignRound4Message {
+    repeated bytes gamma = 1;
     repeated bytes proof = 2;
 }
 
 /*
- * Represents a BROADCAST message sent to all parties during Round 3 of the Accountable ECDSA TSS signing protocol.
+ * Represents a BROADCAST message sent to all parties during Round 4 of the Accountable ECDSA TSS signing protocol.
  */
-message SignRound4Message {
-    repeated bytes gamma = 1;
+message SignRound5Message {
+    bytes s = 1;
     repeated bytes proof = 2;
 }

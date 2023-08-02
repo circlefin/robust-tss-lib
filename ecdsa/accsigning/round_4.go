@@ -21,7 +21,20 @@ func (round *round4) Start() *tss.Error {
 	round.started = true
 	round.resetOK()
 
-	round.ProcessRound3Messages()
+ 	partyCount := len(round.Parties().IDs())
+ 	errChs := make(chan *tss.Error, partyCount*partyCount*3)
+	round.VerifyRound3Messages(errChs)
+	close(errChs)
+	err := round.WrapErrorChs(round.PartyID(), errChs, "Failed to process round 3 messages")
+	if err != nil {
+		return err
+	}
+
+	err = round.ComputeFinalDelta()
+	if err != nil {
+		return err
+	}
+
 	proofs, err := round.ComputeProofs()
 	if err != nil {
 		return err
@@ -35,49 +48,65 @@ func (round *round4) Start() *tss.Error {
 	return nil
 }
 
-func (round *round4) ProcessRound3Messages() *tss.Error {
+func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 	wg := sync.WaitGroup{}
 	i := round.PartyID().Index
-	var err *tss.Error
+	rp := round.key.GetRingPedersen(i)
+	q := round.Params().EC().Params().N
 	for j, _ := range round.Parties().IDs() {
 		if i == j {
 			continue
 		}
 
 		wg.Add(1)
-		go func(sender int, round *round4) {
+		go func(sender int) {
 			defer wg.Done()
 			r3msg := round.temp.signRound3Messages[sender].Content().(*SignRound3Message)
-			proof, errt := r3msg.UnmarshalProof(tss.EC())
-			if errt != nil {
-				err = round.WrapError(errors.New(fmt.Sprintf("failed to parse proof from party %d.", sender)))
+			proof, err := r3msg.UnmarshalProof(tss.EC())
+			if err != nil {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to parse proof from party %d.", sender)))
 				return
 			}
 			delta := r3msg.UnmarshalDelta()
+			if delta == nil {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent nil delta.", sender)))
+				return
+			}
+			d := r3msg.UnmarshalD()
+			if d == nil {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent nil d.", sender)))
+				return
+			}
 			pkj := round.key.PaillierPKs[sender]
+/*			if !common.ModInt(pkj.N).IsCongruent(delta, d) {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent delta /= d mod q.", sender)))
+				return
+			}*/
+
 			statement := &zkproofs.DecStatement{
 				Q:   round.Params().EC().Params().N,
 				Ell: zkproofs.GetEll(round.Params().EC()),
 				N0:  pkj.N,
 				C:   round.temp.D[sender],
-				X:   delta,
+				X:   common.ModInt(q).Mod(d),
 			}
-			rp := round.key.GetRingPedersen(i)
 			if !proof[i].Verify(statement, rp) {
-				err = round.WrapError(errors.New(fmt.Sprintf("failed to verify proof from party %d.", sender)))
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify proof from party %d.", sender)))
 				return
 			}
 			round.temp.delta[sender] = delta
-		}(j, round)
-		if err != nil {
-			return err
-		}
+		}(j)
 	}
 	wg.Wait()
+}
 
-	delta := big.NewInt(1)
+func (round *round4) ComputeFinalDelta() *tss.Error {
+	delta := big.NewInt(0)
 	modN := common.ModInt(round.Params().EC().Params().N)
-	for _, deltaJ := range round.temp.delta {
+	for j, deltaJ := range round.temp.delta {
+		if deltaJ == nil {
+			return round.WrapError(errors.New(fmt.Sprintf("%d: nil delta[%d].", round.PartyID().Index, j)))
+		}
 		delta = modN.Add(delta, deltaJ)
 	}
 	round.temp.finalDelta = delta

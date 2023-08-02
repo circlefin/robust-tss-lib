@@ -32,9 +32,11 @@ func SetupParties(t *testing.T) (
 	params []*tss.Parameters,
 	parties []*LocalParty,
 	outCh chan tss.Message,
+	keys []keygen.LocalPartySaveData,
+	signPIDs tss.SortedPartyIDs,
+	p2pCtx *tss.PeerContext,
 ) {
 	SetUp("info")
-	threshold := testThreshold
 
 	// PHASE: load keygen fixtures
 	keys, signPIDs, err := keygen.LoadKeygenTestFixturesRandomSet(testThreshold+1, testParticipants)
@@ -44,22 +46,22 @@ func SetupParties(t *testing.T) (
 
 	// PHASE: signing
 	// use a shuffled selection of the list of parties for this test
-	p2pCtx := tss.NewPeerContext(signPIDs)
+	p2pCtx = tss.NewPeerContext(signPIDs)
 	parties = make([]*LocalParty, 0, len(signPIDs))
 
-	outCh = make(chan tss.Message, len(signPIDs)*len(signPIDs)*2)
+	outCh = make(chan tss.Message, len(signPIDs)*len(signPIDs)*3)
 	endCh := make(chan common.SignatureData, len(signPIDs))
 
 	//	updater := test.SharedPartyUpdater
 
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
-		Pparams := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
+		Pparams := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), testThreshold)
 		params = append(params, Pparams)
 		P := NewLocalParty(big.NewInt(42), Pparams, keys[i], outCh, endCh).(*LocalParty)
 		parties = append(parties, P)
 	}
-	return params, parties, outCh
+	return params, parties, outCh, keys, signPIDs, p2pCtx
 }
 
 func GetParsedMessage(t *testing.T, message tss.Message, expectedType string) tss.ParsedMessage {
@@ -82,7 +84,6 @@ func IsMessageType(msg tss.Message, expectedType string) bool {
 
 func AssertNoErrors(t *testing.T, errChs chan *tss.Error) {
 	for err := range errChs {
-		t.Logf("%v", err)
 		AssertNoTssError(t, err)
 	}
 }
@@ -94,20 +95,34 @@ func AssertNoTssError(t *testing.T, err *tss.Error) {
 }
 
 func DeliverMessages(t *testing.T, totalMessages int, parties []*LocalParty, outCh chan tss.Message) {
-	errChs := make(chan *tss.Error, (len(parties) * 3))
-	for num := 0; num < totalMessages; num += 1 {
+	errChs := make(chan *tss.Error, len(parties)*3)
+	maxErrors := 20
+	length := len(outCh)
+	t.Logf("Delivering totalMessages=%d, length=%d, lenErr=%d", totalMessages, length, len(errChs))
+	for num := 0; num < totalMessages && num < length; num += 1 {
+		if len(errChs) > maxErrors {
+			t.Logf("too many errors")
+			break
+		}
+		//	    t.Logf("num %d of %d %d", num, totalMessages, length)
 		var msg tss.Message = <-outCh
 		dest := msg.GetTo()
 		if dest == nil || len(dest) == 0 {
+			//		    t.Logf("delivering broadcast")
 			for recipient, _ := range parties {
 				test.SharedPartyUpdater(parties[recipient], msg, errChs)
 			}
+			//			t.Logf("ok")
 		} else {
+			//		    t.Logf("delivering P2P")
 			test.SharedPartyUpdater(parties[dest[0].Index], msg, errChs)
+			//			t.Logf("ok")
 		}
 	}
 	close(errChs)
+	t.Logf("Delivered")
 	AssertNoErrors(t, errChs)
+	t.Logf("No Errors")
 }
 
 func RunRound1(t *testing.T, params []*tss.Parameters, parties []*LocalParty, outCh chan tss.Message) []*round1 {
@@ -141,24 +156,28 @@ func RunRound[InRound tss.Round, OutRound tss.Round](
 	totalMessages int,
 	outCh chan tss.Message,
 ) []OutRound {
+	t.Logf("Updating")
+
 	outrounds := make([]OutRound, len(parties))
 	for j, round := range inrounds {
 		ok, tssErr := round.Update()
 		assert.True(t, ok)
-		assert.Nil(t, tssErr)
+		AssertNoTssError(t, tssErr)
 		outrounds[j] = round.NextRound().(OutRound)
 	}
+	t.Logf("Running round")
 
 	wg := sync.WaitGroup{}
 	for j, round := range outrounds {
 		wg.Add(1)
 		go func(j int, round OutRound) {
 			defer wg.Done()
-			tssError := round.Start()
-			AssertNoTssError(t, tssError)
+			tssErr := round.Start()
+			AssertNoTssError(t, tssErr)
 		}(j, round)
 	}
 	wg.Wait()
+	t.Logf("Delivering")
 	DeliverMessages(t, totalMessages, parties, outCh)
 	return outrounds
 }

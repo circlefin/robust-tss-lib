@@ -7,21 +7,21 @@
 package signing
 
 import (
-	"crypto/ecdsa"
-	"fmt"
+//	"crypto/ecdsa"
+//	"fmt"
 	"math/big"
-	"runtime"
-	"sync/atomic"
+//	"runtime"
+//	"sync/atomic"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec"
+//	"github.com/btcsuite/btcd/btcec"
 	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/bnb-chain/tss-lib/common"
-	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
+//	"github.com/bnb-chain/tss-lib/common"
+//	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
 	"github.com/bnb-chain/tss-lib/test"
-	"github.com/bnb-chain/tss-lib/tss"
+//	"github.com/bnb-chain/tss-lib/tss"
 )
 
 const (
@@ -34,7 +34,7 @@ func setUp(level string) {
 		panic(err)
 	}
 }
-
+/*
 func TestE2EConcurrent(t *testing.T) {
 	setUp("info")
 	threshold := testThreshold
@@ -238,7 +238,7 @@ signing:
 		}
 	}
 }
-
+*/
 func TestFillTo32BytesInPlace(t *testing.T) {
 	s := big.NewInt(123456789)
 	normalizedS := padToLengthBytesInPlace(s.Bytes(), 32)

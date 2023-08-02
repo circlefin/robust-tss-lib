@@ -29,6 +29,7 @@ test_unit:
 	go test -timeout 60m -v github.com/bnb-chain/tss-lib/crypto/paillier
 	go test -timeout 60m -v github.com/bnb-chain/tss-lib/crypto/zkproofs
 	go test -timeout 60m -v github.com/bnb-chain/tss-lib/crypto/accmta
+	go test -timeout 60m -v github.com/bnb-chain/tss-lib/ecdsa/signing
 	go test -timeout 60m -v github.com/bnb-chain/tss-lib/ecdsa/accsigning
 #	go test -timeout 60m $(PACKAGES)
 

@@ -144,7 +144,8 @@ func TestMultInv(t *testing.T) {
  	inv, _ := publicKey.HomoMultInv(cipher)
  	negNum, _ := privateKey.Decrypt(inv)
  	actual := common.ModInt(publicKey.N).Add(num, negNum)
- 	assert.True(t, common.ModInt(publicKey.N).Congruent(zero, actual))
+ 	assert.True(t, common.ModInt(publicKey.N).IsCongruent(zero, actual))
+ 	assert.True(t, common.ModInt(publicKey.N).IsAdditiveInverse(num, negNum))
  }
 
 func TestHomoAdd(t *testing.T) {

@@ -49,9 +49,11 @@ func (round *round1) Start() *tss.Error {
 
 	paillierSK := round.key.PaillierSK
 	paillierPK := &paillier.PublicKey{N: paillierSK.N}
-	q := round.Params().EC().Params().N
+	//	q := round.Params().EC().Params().N
 
-	k := common.GetRandomPositiveInt(q)
+	// todo: make random k
+	k := big.NewInt(333)
+	//	k := common.GetRandomPositiveInt(q)
 	cA, rA, err := paillierPK.EncryptAndReturnRandomness(k)
 	if err != nil {
 		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
@@ -66,7 +68,9 @@ func (round *round1) Start() *tss.Error {
 		K:  cA,
 	}
 
-	gamma := common.GetRandomPositiveInt(q)
+	// todo: make random gamma
+	gamma := big.NewInt(123)
+	//	gamma := common.GetRandomPositiveInt(q)
 	Xgamma, rhoxgamma, err := paillierPK.EncryptAndReturnRandomness(gamma)
 	if err != nil {
 		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
@@ -131,6 +135,7 @@ func (round *round1) Start() *tss.Error {
 	round.temp.pointGamma[i] = pointGamma
 	round.temp.Xgamma[i] = Xgamma
 	round.temp.Xkgamma[i] = Xkgamma
+	round.temp.Xkw[i] = Xkw
 	round.temp.cA[i] = cA
 	//	round.temp.deCommit = cmt.D
 
@@ -166,9 +171,6 @@ func (round *round1) Start() *tss.Error {
 			proofXk, proofXgamma, proofXkw,
 		)
 		round.out <- r1msg1
-		if r1msg1.GetTo() == nil || len(r1msg1.GetTo()) == 0 {
-			return round.WrapError(fmt.Errorf("failed to set r1msg1.To"))
-		}
 	}
 
 	// broadcast

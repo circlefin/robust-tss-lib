@@ -1,6 +1,7 @@
 package zkproofs_test
 
 import (
+    "math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,20 +40,22 @@ func TestDecProof(t *testing.T) {
 }
 
 func GenerateDecProofData(t *testing.T) (*zkproofs.DecWitness, *zkproofs.DecStatement) {
+    y := common.GetRandomPositiveInt(publicKey.N)
+    x := new(big.Int).Mod(y, q)
 	witness := &zkproofs.DecWitness{
-		Y:   common.GetRandomPositiveInt(q),
-		Rho: common.GetRandomPositiveInt(q),
+		Y:   y,
+		Rho: common.GetRandomPositiveInt(publicKey.N),
 	}
 
 	// C = Encrypt(N0, k, rho)
-	C, err := publicKey.EncryptWithRandomness(witness.Y, witness.Rho)
+	C, err := publicKey.EncryptWithRandomness(y, witness.Rho)
 	assert.NoError(t, err, "encrypt C not error")
 	statement := &zkproofs.DecStatement{
 		Q:   q,
 		Ell: ell,
 		N0:  publicKey.N,
 		C:   C,
-		X:   witness.Y,
+		X:   x,
 	}
 	return witness, statement
 }

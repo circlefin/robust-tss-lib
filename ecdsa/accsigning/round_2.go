@@ -33,39 +33,63 @@ func (round *round2) Start() *tss.Error {
 			continue
 		}
 
-		wg.Add(3)
-		go round.Round2Verify(j, Pj, &wg, errChs)
+		wg.Add(2)
 		go round.BobRespondsP(j, Pj, &wg, errChs)
 		go round.BobRespondsDL(j, Pj, &wg, errChs)
 	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		round.VerifyRound1Messages(errChs)
+	}()
 	wg.Wait()
 	close(errChs)
-	culprits := make([]*tss.PartyID, 0, len(round.Parties().IDs()))
-	for err := range errChs {
-		culprits = append(culprits, err.Culprits()...)
+	err := round.WrapErrorChs(round.PartyID(), errChs, "Failed to verify round 4 messages")
+	if err != nil {
+		return err
 	}
-	if len(culprits) > 0 {
-		return round.WrapError(errors.New("failed to calculate Bob_mid or Bob_mid_wc"), culprits...)
-	}
+
 	// create and send messages
 	for j, Pj := range round.Parties().IDs() {
 		if j == i {
 			continue
 		}
+		if round.temp.cAlpha[i][j] == nil {
+			return round.WrapError(fmt.Errorf("problem with cAlpha %d %d ", i, j))
+		}
+
 		r2msg := NewSignRound2Message(
 			Pj, round.PartyID(),
 			round.temp.cAlpha[i][j],
+			round.temp.cBeta[i][j],
 			round.temp.cBetaPrm[i][j],
 			round.temp.cMu[i][j],
+			round.temp.cNu[i][j],
 			round.temp.cNuPrm[i][j],
-			round.temp.proofP[i][j], round.temp.proofDL[i][j])
+			round.temp.proofP[i][j], round.temp.proofDL[i][j],
+			round.temp.proofBeta[i][j], round.temp.proofNu[i][j])
 		round.out <- r2msg
 	}
 	return nil
 }
 
-func (round *round2) Round2Verify(j int, Pj *tss.PartyID, wg *sync.WaitGroup, errChs chan *tss.Error) {
-	defer wg.Done()
+func (round *round2) VerifyRound1Messages(errChs chan *tss.Error) {
+	wg := sync.WaitGroup{}
+	i := round.PartyID().Index
+	for j, Pj := range round.Parties().IDs() {
+		if i == j {
+			continue
+		}
+		wg.Add(1)
+		go func(j int, Pj *tss.PartyID) {
+			defer wg.Done()
+			round.VerifyRound1Message(j, Pj, errChs)
+		}(j, Pj)
+	}
+	wg.Wait()
+}
+
+func (round *round2) VerifyRound1Message(j int, Pj *tss.PartyID, errChs chan *tss.Error) {
 	i := round.PartyID().Index
 
 	if round.temp.signRound1Message1s[j] == nil {
@@ -97,7 +121,7 @@ func (round *round2) Round2Verify(j int, Pj *tss.PartyID, wg *sync.WaitGroup, er
 	}
 	round.temp.Xgamma[j] = r1msg2.UnmarshalXGamma()
 	round.temp.Xkgamma[j] = r1msg2.UnmarshalXKGamma()
-	Xkw := r1msg2.UnmarshalXKw()
+	round.temp.Xkw[j] = r1msg2.UnmarshalXKw()
 	rp := round.key.GetRingPedersen(i)
 
 	paillierPK := round.key.PaillierPKs[j]
@@ -122,7 +146,7 @@ func (round *round2) Round2Verify(j int, Pj *tss.PartyID, wg *sync.WaitGroup, er
 		Ell: zkproofs.GetEll(round.Params().EC()),
 		N0:  paillierPK.N,
 		C:   round.temp.cA[j],
-		D:   Xkw,
+		D:   round.temp.Xkw[j],
 		X:   bigW,
 	}
 
@@ -156,7 +180,7 @@ func (round *round2) BobRespondsP(j int, Pj *tss.PartyID, wg *sync.WaitGroup, er
 	ringPedersenBobI := round.key.GetRingPedersen(i)
 	rpVs := round.key.GetAllRingPedersen()
 	rpVs[i] = nil
-	beta, cAlpha, cBetaPrm, proofs, err := accmta.BobRespondsP(
+	beta, cAlpha, cBeta, cBetaPrm, proofs, decProofs, err := accmta.BobRespondsP(
 		round.Params().EC(),
 		// Alice's public key
 		round.key.PaillierPKs[j],
@@ -173,12 +197,22 @@ func (round *round2) BobRespondsP(j int, Pj *tss.PartyID, wg *sync.WaitGroup, er
 		// Bob's Ring Pedersen parameters
 		ringPedersenBobI,
 	)
+	if cAlpha == nil {
+		errChs <- round.WrapError(fmt.Errorf("nil cAlpha[%d][%d]", i, j))
+		return
+	}
+	if cBeta == nil {
+		errChs <- round.WrapError(fmt.Errorf("nil cBeta[%d][%d]", i, j))
+		return
+	}
 
 	// should be thread safe as these are pre-allocated
 	round.temp.beta[j] = beta
 	round.temp.cAlpha[i][j] = cAlpha
+	round.temp.cBeta[i][j] = cBeta
 	round.temp.cBetaPrm[i][j] = cBetaPrm
 	round.temp.proofP[i][j] = proofs
+	round.temp.proofBeta[i][j] = decProofs
 	if err != nil {
 		errChs <- round.WrapError(err, Pj)
 	}
@@ -205,12 +239,12 @@ func (round *round2) BobRespondsDL(j int, Pj *tss.PartyID, wg *sync.WaitGroup, e
 	ringPedersenBobI := round.key.GetRingPedersen(i)
 	rpVs := round.key.GetAllRingPedersen()
 	rpVs[i] = nil
-	nu, cMu, cNuPrm, proofs, err := accmta.BobRespondsDL(
+	nu, cMu, cNu, cNuPrm, proofs, decProofs, err := accmta.BobRespondsDL(
 		round.Params().EC(),
 		// Alice's public key
 		round.key.PaillierPKs[j],
 		// Bob's public key
-		round.key.PaillierPKs[i],
+		round.key.PaillierSK,
 		// Alice's proof
 		rangeProofAliceJ,
 		// Bob's secret
@@ -226,8 +260,10 @@ func (round *round2) BobRespondsDL(j int, Pj *tss.PartyID, wg *sync.WaitGroup, e
 	)
 	round.temp.nu[j] = nu
 	round.temp.cMu[i][j] = cMu
+	round.temp.cNu[i][j] = cNu
 	round.temp.cNuPrm[i][j] = cNuPrm
 	round.temp.proofDL[i][j] = proofs
+	round.temp.proofNu[i][j] = decProofs
 	if err != nil {
 		errChs <- round.WrapError(err, Pj)
 	}
