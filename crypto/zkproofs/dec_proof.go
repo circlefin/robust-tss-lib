@@ -145,13 +145,7 @@ func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 }
 
 func (proof *DecProof) GetChallenge(stmt *DecStatement, rp *RingPedersenParams) *big.Int {
-	msg := []*big.Int{
-	stmt.Ell, stmt.Q, stmt.N0,
-//	stmt.C,
-	stmt.X,
-//	rp.N, rp.S, rp.T,
-//	proof.S, proof.T, proof.A, proof.Gamma,
-	}
+	msg := []*big.Int{stmt.Ell, stmt.Q, stmt.N0, stmt.C, stmt.X, rp.N, rp.S, rp.T, proof.S, proof.T, proof.A, proof.Gamma}
 	e := common.SHA512_256i(msg...)
 	return e
 }
