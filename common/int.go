@@ -72,6 +72,11 @@ func (mi *modInt) IsAdditiveInverse(a, b *big.Int) bool {
     return mi.IsCongruent(sum, zero)
 }
 
+func (mi *modInt) IsMultInverse(a, b *big.Int) bool {
+    prod := mi.Mul(a, b)
+    one := big.NewInt(1)
+    return mi.IsCongruent(prod, one)
+}
 
 func (mi *modInt) i() *big.Int {
 	return (*big.Int)(mi)

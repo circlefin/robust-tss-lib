@@ -23,7 +23,7 @@ func (round *round5) Start() *tss.Error {
 	round.started = true
 	round.resetOK()
 
-	err := round.ProcessRound4Messages()
+	err := round.VerifyRound4Messages()
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (round *round5) Start() *tss.Error {
 	return nil
 }
 
-func (round *round5) ProcessRound4Messages() *tss.Error {
+func (round *round5) VerifyRound4Messages() *tss.Error {
 	errChs := make(chan *tss.Error, len(round.Parties().IDs()))
 	wg := sync.WaitGroup{}
 	i := round.PartyID().Index
@@ -117,13 +117,13 @@ func (round *round5) ComputeR() *tss.Error {
 		}
 	}
 	round.temp.bigR = bigR.ScalarMult(round.temp.finalDeltaInv)
-	round.temp.rx = bigR.X()
-	round.temp.ry = bigR.X()
+	round.temp.rx = round.temp.bigR.X()
+	round.temp.ry = round.temp.bigR.Y()
 	return nil
 }
 
 func (round *round5) ComputeSi() (err *tss.Error) {
-	modN := common.ModInt(round.Params().EC().Params().N)
+	modQ := common.ModInt(round.Params().EC().Params().N)
 	wg := sync.WaitGroup{}
 	err = nil
 
@@ -138,13 +138,8 @@ func (round *round5) ComputeSi() (err *tss.Error) {
 				if j == i {
 					continue
 				}
-				cNu, erri := pki.HomoMultInv(round.temp.cNuPrm[i][j]) // encrypted under pki
-				if erri != nil {
-					err = round.WrapError(erri)
-					return
-				}
 				Psi = modN2.Mul(Psi, round.temp.cMu[j][i]) // encrypted under pki
-				Psi = modN2.Mul(Psi, cNu)                  // encrypted under pki
+				Psi = modN2.Mul(Psi, round.temp.cNu[i][j]) // encrypted under pki
 			}
 			S := zkproofs.PseudoPaillierEncrypt(
 				round.temp.cA[i],
@@ -159,12 +154,13 @@ func (round *round5) ComputeSi() (err *tss.Error) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		sigma := modN.Mul(round.temp.k, round.temp.w)
+		sigma := modQ.Mul(round.temp.k, round.temp.w)
 		for j := range round.Parties().IDs() {
 			if j == round.PartyID().Index {
 				continue
 			}
-			sigma = modN.Add(sigma, new(big.Int).Add(round.temp.mu[j], round.temp.nu[j]))
+    		temp := modQ.Add(round.temp.mu[j], round.temp.nu[j])
+    		sigma = modQ.Add(sigma, temp)
 		}
 		round.temp.sigma = sigma
 	}()
@@ -172,7 +168,7 @@ func (round *round5) ComputeSi() (err *tss.Error) {
 	if err != nil {
 		return err
 	}
-	round.temp.si = modN.Add(modN.Mul(round.temp.m, round.temp.k), modN.Mul(round.temp.rx, round.temp.sigma))
+    round.temp.si = modQ.Add(modQ.Mul(round.temp.m, round.temp.k), modQ.Mul(round.temp.rx, round.temp.sigma))
 	return nil
 }
 

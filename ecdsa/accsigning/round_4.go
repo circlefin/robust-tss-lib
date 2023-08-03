@@ -78,17 +78,17 @@ func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 				return
 			}
 			pkj := round.key.PaillierPKs[sender]
-/*			if !common.ModInt(pkj.N).IsCongruent(delta, d) {
+			if !common.ModInt(q).IsCongruent(delta, d) {
 				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent delta /= d mod q.", sender)))
 				return
-			}*/
+			}
 
 			statement := &zkproofs.DecStatement{
-				Q:   round.Params().EC().Params().N,
+				Q:   q,
 				Ell: zkproofs.GetEll(round.Params().EC()),
 				N0:  pkj.N,
 				C:   round.temp.D[sender],
-				X:   common.ModInt(q).Mod(d),
+				X:   delta,
 			}
 			if !proof[i].Verify(statement, rp) {
 				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify proof from party %d.", sender)))

@@ -73,7 +73,7 @@ func (round *finalization) Start() *tss.Error {
 
 func (round *finalization) GetSumS() *big.Int {
 	sumS := round.temp.si
-	modN := common.ModInt(round.Params().EC().Params().N)
+	modQ := common.ModInt(round.Params().EC().Params().N)
 
 	for j := range round.Parties().IDs() {
 		round.ok[j] = true
@@ -81,7 +81,7 @@ func (round *finalization) GetSumS() *big.Int {
 			continue
 		}
 		r5msg := round.temp.signRound5Messages[j].Content().(*SignRound5Message)
-		sumS = modN.Add(sumS, r5msg.UnmarshalS())
+		sumS = modQ.Add(sumS, r5msg.UnmarshalS())
 	}
 	return sumS
 }

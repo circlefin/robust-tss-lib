@@ -49,11 +49,9 @@ func (round *round1) Start() *tss.Error {
 
 	paillierSK := round.key.PaillierSK
 	paillierPK := &paillier.PublicKey{N: paillierSK.N}
-	//	q := round.Params().EC().Params().N
+	q := round.Params().EC().Params().N
 
-	// todo: make random k
-	k := big.NewInt(333)
-	//	k := common.GetRandomPositiveInt(q)
+	k := common.GetRandomPositiveInt(q)
 	cA, rA, err := paillierPK.EncryptAndReturnRandomness(k)
 	if err != nil {
 		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
@@ -68,9 +66,7 @@ func (round *round1) Start() *tss.Error {
 		K:  cA,
 	}
 
-	// todo: make random gamma
-	gamma := big.NewInt(123)
-	//	gamma := common.GetRandomPositiveInt(q)
+	gamma := common.GetRandomPositiveInt(q)
 	Xgamma, rhoxgamma, err := paillierPK.EncryptAndReturnRandomness(gamma)
 	if err != nil {
 		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
@@ -128,7 +124,6 @@ func (round *round1) Start() *tss.Error {
 	// save data for later in round.temp (todo)
 
 	pointGamma := crypto.ScalarBaseMult(round.Params().EC(), gamma)
-	//	cmt := commitments.NewHashCommitment(pointGamma.X(), pointGamma.Y())
 	round.temp.k = k
 	round.temp.gamma = gamma
 	round.temp.rhoxgamma = rhoxgamma

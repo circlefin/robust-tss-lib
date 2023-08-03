@@ -86,10 +86,10 @@ type (
 		D,
 		alpha,
 		mu []*big.Int // [sender] -> self
+		d,
 		keyDerivationDelta *big.Int
 
 		// round 4
-		d,
 		finalDelta,
 		finalDeltaInv *big.Int
 		pointGamma []*crypto.ECPoint

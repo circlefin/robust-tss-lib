@@ -46,12 +46,8 @@ func (round *round1) Start() *tss.Error {
 	round.started = true
 	round.resetOK()
 
-// todo: make random k
-	k := big.NewInt(333)
-//	k := common.GetRandomPositiveInt(round.Params().EC().Params().N)
-// todo: make random gamma
-	gamma := big.NewInt(123)
-//	gamma := common.GetRandomPositiveInt(round.Params().EC().Params().N)
+	k := common.GetRandomPositiveInt(round.Params().EC().Params().N)
+	gamma := common.GetRandomPositiveInt(round.Params().EC().Params().N)
 
 	pointGamma := crypto.ScalarBaseMult(round.Params().EC(), gamma)
 	cmt := commitments.NewHashCommitment(pointGamma.X(), pointGamma.Y())

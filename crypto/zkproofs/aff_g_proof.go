@@ -238,7 +238,7 @@ func (proof *AffGProof) GetChallenge(stmt *AffGStatement, rp *RingPedersenParams
 		stmt.X.Y(),
 		stmt.Y,
 		stmt.C,
-		stmt.D, // todo: error in this line (likely decoding)
+		stmt.D,
 		rp.N, rp.S, rp.T,
 		proof.A, proof.Bx.X(), proof.Bx.Y(), proof.By, proof.E, proof.S, proof.F, proof.T,
 	}

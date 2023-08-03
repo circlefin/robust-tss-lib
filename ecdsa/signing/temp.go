@@ -25,20 +25,7 @@ func Run(
     signPIDs tss.SortedPartyIDs,
     p2pCtx *tss.PeerContext,
 ) *OutStruct {
-//	testParticipants := test.TestParticipants
-//	testThreshold := test.TestThreshold
 	threshold := test.TestThreshold
-
-	// PHASE: load keygen fixtures
-	// todo: make deterministic
-//	keys, signPIDs, _ := keygen.LoadKeygenTestFixturesRandomSet(testThreshold+1, testParticipants)
-	//	assert.NoError(t, err, "should load keygen fixtures")
-	//	assert.Equal(t, testThreshold+1, len(keys))
-	//	assert.Equal(t, testThreshold+1, len(signPIDs))
-
-	// PHASE: signing
-	// use a shuffled selection of the list of parties for this test
-	//p2pCtx := tss.NewPeerContext(signPIDs)
 	parties := make([]*LocalParty, 0, len(signPIDs))
 
 	errCh := make(chan *tss.Error, len(signPIDs))
@@ -100,7 +87,6 @@ signing:
 				sumS := big.NewInt(0)
 				sumK := big.NewInt(0)
 				for i, p := range parties {
-				    assert.Equal(t, 0, parties[i].temp.k.Cmp(big.NewInt(333)))
 					sumS = modN.Add(sumS, p.temp.si)
 					sumK = modN.Add(sumK, parties[i].temp.k)
 				}
@@ -123,10 +109,16 @@ signing:
 				si := make([]*big.Int, len(parties))
 				ks := make([]*big.Int, len(parties))
 				ws := make([]*big.Int, len(parties))
+				gammas := make([]*big.Int, len(parties))
+				sigmas := make([]*big.Int, len(parties))
+				pointGammas :=  make([]*crypto.ECPoint, len(parties))
 				for i, _ := range parties {
                     si[i] = parties[i].temp.si
                     ks[i] = parties[i].temp.k
                     ws[i] = parties[i].temp.w
+                    gammas[i] = parties[i].temp.gamma
+                    sigmas[i] = parties[i].temp.sigma
+                    pointGammas[i]= parties[i].temp.pointGamma
 				}
 				return &OutStruct{
                     K:    sumK,
@@ -142,6 +134,9 @@ signing:
 					Ws: ws,
 					Theta: party.temp.theta,
 					ThetaInv: party.temp.thetaInverse,
+					Gamma: gammas,
+					PointGamma: pointGammas,
+					Sigma: sigmas,
 				}
 
 				break signing
@@ -155,5 +150,6 @@ signing:
 type OutStruct struct {
 	K, M, Rx, Ry, SumS, PkX, PkY, Theta, ThetaInv *big.Int
 	R               *crypto.ECPoint
-	Si, Ks, Ws              []*big.Int
+	PointGamma []*crypto.ECPoint
+	Si, Ks, Ws, Gamma, Sigma              []*big.Int
 }

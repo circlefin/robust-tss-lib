@@ -98,31 +98,23 @@ func DeliverMessages(t *testing.T, totalMessages int, parties []*LocalParty, out
 	errChs := make(chan *tss.Error, len(parties)*3)
 	maxErrors := 20
 	length := len(outCh)
-	t.Logf("Delivering totalMessages=%d, length=%d, lenErr=%d", totalMessages, length, len(errChs))
 	for num := 0; num < totalMessages && num < length; num += 1 {
 		if len(errChs) > maxErrors {
 			t.Logf("too many errors")
 			break
 		}
-		//	    t.Logf("num %d of %d %d", num, totalMessages, length)
 		var msg tss.Message = <-outCh
 		dest := msg.GetTo()
 		if dest == nil || len(dest) == 0 {
-			//		    t.Logf("delivering broadcast")
 			for recipient, _ := range parties {
 				test.SharedPartyUpdater(parties[recipient], msg, errChs)
 			}
-			//			t.Logf("ok")
 		} else {
-			//		    t.Logf("delivering P2P")
 			test.SharedPartyUpdater(parties[dest[0].Index], msg, errChs)
-			//			t.Logf("ok")
 		}
 	}
 	close(errChs)
-	t.Logf("Delivered")
 	AssertNoErrors(t, errChs)
-	t.Logf("No Errors")
 }
 
 func RunRound1(t *testing.T, params []*tss.Parameters, parties []*LocalParty, outCh chan tss.Message) []*round1 {
