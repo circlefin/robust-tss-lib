@@ -11,9 +11,8 @@ option go_package = "ecdsa/accsigning";
  */
 message SignRound1Message1 {
     repeated bytes range_proof_alice = 1;
-    repeated bytes proof_x_k = 2;
-    repeated bytes proof_x_gamma = 3;
-    repeated bytes proof_x_kw = 4;
+    repeated bytes proof_x_gamma = 2;
+    repeated bytes proof_x_kw = 3;
 }
 
 /*

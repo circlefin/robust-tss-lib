@@ -7,10 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	errorspkg "github.com/pkg/errors"
-
 	"github.com/bnb-chain/tss-lib/crypto/accmta"
-	//	"github.com/bnb-chain/tss-lib/crypto/paillier"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -26,6 +23,12 @@ func (round *round2) Start() *tss.Error {
 	i := round.PartyID().Index
 	round.ok[i] = true
 
+	partyCount := len(round.Parties().IDs())
+	proofP := Make2DSlice[*zkproofs.AffPProof](partyCount)
+	proofDL := Make2DSlice[*zkproofs.AffGProof](partyCount)
+	proofBeta := Make2DSlice[*zkproofs.DecProof](partyCount)
+	proofNu := Make2DSlice[*zkproofs.DecProof](partyCount)
+
 	errChs := make(chan *tss.Error, (len(round.Parties().IDs())-1)*3)
 	wg := sync.WaitGroup{}
 	for j, Pj := range round.Parties().IDs() {
@@ -34,8 +37,8 @@ func (round *round2) Start() *tss.Error {
 		}
 
 		wg.Add(2)
-		go round.BobRespondsP(j, Pj, &wg, errChs)
-		go round.BobRespondsDL(j, Pj, &wg, errChs)
+		go round.BobRespondsP(j, Pj, proofP, proofBeta, &wg, errChs)
+		go round.BobRespondsDL(j, Pj, proofDL, proofNu, &wg, errChs)
 	}
 	wg.Add(1)
 	go func() {
@@ -49,13 +52,9 @@ func (round *round2) Start() *tss.Error {
 		return err
 	}
 
-	// create and send messages
 	for j, Pj := range round.Parties().IDs() {
 		if j == i {
 			continue
-		}
-		if round.temp.cAlpha[i][j] == nil {
-			return round.WrapError(fmt.Errorf("problem with cAlpha %d %d ", i, j))
 		}
 
 		r2msg := NewSignRound2Message(
@@ -66,8 +65,8 @@ func (round *round2) Start() *tss.Error {
 			round.temp.cMu[i][j],
 			round.temp.cNu[i][j],
 			round.temp.cNuPrm[i][j],
-			round.temp.proofP[i][j], round.temp.proofDL[i][j],
-			round.temp.proofBeta[i][j], round.temp.proofNu[i][j])
+			proofP[j], proofDL[j],
+			proofBeta[j], proofNu[j])
 		round.out <- r2msg
 	}
 	return nil
@@ -92,16 +91,7 @@ func (round *round2) VerifyRound1Messages(errChs chan *tss.Error) {
 func (round *round2) VerifyRound1Message(j int, Pj *tss.PartyID, errChs chan *tss.Error) {
 	i := round.PartyID().Index
 
-	if round.temp.signRound1Message1s[j] == nil {
-		errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j))
-		return
-	}
 	r1msg1 := round.temp.signRound1Message1s[j].Content().(*SignRound1Message1)
-	proofXK, err := r1msg1.UnmarshalProofXK()
-	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("error parsing r1msg1[%d]", j))
-		return
-	}
 	proofXgamma, err := r1msg1.UnmarshalProofXGamma()
 	if err != nil {
 		errChs <- round.WrapError(fmt.Errorf("error parsing r1msg1[%d]", j))
@@ -126,11 +116,6 @@ func (round *round2) VerifyRound1Message(j int, Pj *tss.PartyID, errChs chan *ts
 
 	paillierPK := round.key.PaillierPKs[j]
 	bigW := round.temp.bigWs[j]
-	statementXk := &zkproofs.EncStatement{
-		EC: round.Params().EC(),
-		N0: paillierPK.N,
-		K:  round.temp.cA[j],
-	}
 	statementXgamma := &zkproofs.EncStatement{
 		EC: round.Params().EC(),
 		N0: paillierPK.N,
@@ -150,8 +135,7 @@ func (round *round2) VerifyRound1Message(j int, Pj *tss.PartyID, errChs chan *ts
 		X:   bigW,
 	}
 
-	if !proofXK.Verify(statementXk, rp) ||
-		!proofXgamma.Verify(statementXgamma, rp) ||
+	if !proofXgamma.Verify(statementXgamma, rp) ||
 		!proofXkgamma.Verify(statementXkgamma) ||
 		!proofXkw.Verify(statementXkw, rp) {
 		errChs <- round.WrapError(fmt.Errorf("Failed to verify proofs from [%d]", j))
@@ -160,7 +144,7 @@ func (round *round2) VerifyRound1Message(j int, Pj *tss.PartyID, errChs chan *ts
 	return
 }
 
-func (round *round2) BobRespondsP(j int, Pj *tss.PartyID, wg *sync.WaitGroup, errChs chan *tss.Error) {
+func (round *round2) BobRespondsP(j int, Pj *tss.PartyID, proofP [][]*zkproofs.AffPProof, proofBeta [][]*zkproofs.DecProof, wg *sync.WaitGroup, errChs chan *tss.Error) {
 	defer wg.Done()
 	i := round.PartyID().Index
 	if round.temp.signRound1Message1s[j] == nil {
@@ -173,7 +157,7 @@ func (round *round2) BobRespondsP(j int, Pj *tss.PartyID, wg *sync.WaitGroup, er
 	r1msg := round.temp.signRound1Message1s[j].Content().(*SignRound1Message1)
 	rangeProofAliceJ, err := r1msg.UnmarshalRangeProofAlice()
 	if err != nil {
-		errChs <- round.WrapError(errorspkg.Wrapf(err, "UnmarshalRangeProofAlice failed"), Pj)
+		errChs <- round.WrapError(fmt.Errorf("UnmarshalRangeProofAlice failed."), Pj)
 		return
 	}
 
@@ -197,13 +181,8 @@ func (round *round2) BobRespondsP(j int, Pj *tss.PartyID, wg *sync.WaitGroup, er
 		// Bob's Ring Pedersen parameters
 		ringPedersenBobI,
 	)
-	if cAlpha == nil {
-		errChs <- round.WrapError(fmt.Errorf("nil cAlpha[%d][%d]", i, j))
-		return
-	}
-	if cBeta == nil {
-		errChs <- round.WrapError(fmt.Errorf("nil cBeta[%d][%d]", i, j))
-		return
+	if err != nil {
+		errChs <- round.WrapError(err, Pj)
 	}
 
 	// should be thread safe as these are pre-allocated
@@ -211,28 +190,21 @@ func (round *round2) BobRespondsP(j int, Pj *tss.PartyID, wg *sync.WaitGroup, er
 	round.temp.cAlpha[i][j] = cAlpha
 	round.temp.cBeta[i][j] = cBeta
 	round.temp.cBetaPrm[i][j] = cBetaPrm
-	round.temp.proofP[i][j] = proofs
-	round.temp.proofBeta[i][j] = decProofs
-	if err != nil {
-		errChs <- round.WrapError(err, Pj)
-	}
+	proofP[j] = proofs
+	proofBeta[j] = decProofs
 }
 
 // BobRespondsDL on share k*w, Bob's secret is w
-func (round *round2) BobRespondsDL(j int, Pj *tss.PartyID, wg *sync.WaitGroup, errChs chan *tss.Error) {
+func (round *round2) BobRespondsDL(j int, Pj *tss.PartyID, proofDL [][]*zkproofs.AffGProof, proofNu [][]*zkproofs.DecProof, wg *sync.WaitGroup, errChs chan *tss.Error) {
 	defer wg.Done()
 	i := round.PartyID().Index
-	if round.temp.signRound1Message1s[j] == nil {
-		errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j))
-		return
-	}
 	r2msg := round.temp.signRound1Message2s[j].Content().(*SignRound1Message2)
 	cA := r2msg.UnmarshalCA()
 
 	r1msg := round.temp.signRound1Message1s[j].Content().(*SignRound1Message1)
 	rangeProofAliceJ, err := r1msg.UnmarshalRangeProofAlice()
 	if err != nil {
-		errChs <- round.WrapError(errorspkg.Wrapf(err, "UnmarshalRangeProofAlice failed"), Pj)
+		errChs <- round.WrapError(fmt.Errorf("UnmarshalRangeProofAlice failed"), Pj)
 		return
 	}
 
@@ -258,15 +230,16 @@ func (round *round2) BobRespondsDL(j int, Pj *tss.PartyID, wg *sync.WaitGroup, e
 		// DL commitment to Bob's input b
 		round.temp.bigWs[i],
 	)
+	if err != nil {
+		errChs <- round.WrapError(err, Pj)
+	}
+
 	round.temp.nu[j] = nu
 	round.temp.cMu[i][j] = cMu
 	round.temp.cNu[i][j] = cNu
 	round.temp.cNuPrm[i][j] = cNuPrm
-	round.temp.proofDL[i][j] = proofs
-	round.temp.proofNu[i][j] = decProofs
-	if err != nil {
-		errChs <- round.WrapError(err, Pj)
-	}
+	proofDL[j] = proofs
+	proofNu[j] = decProofs
 }
 
 func (round *round2) Update() (bool, *tss.Error) {

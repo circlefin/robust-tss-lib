@@ -1,5 +1,4 @@
 // Copyright 2023 Circle
-//
 
 package accsigning
 
@@ -48,20 +47,15 @@ func (round *round3) Start() *tss.Error {
 		return err
 	}
 
-
-	proofs, err := round.ComputeProofs()
+	d, proofs, err := round.ComputeProofs()
 	if err != nil {
 		return err
-	}
-
-	if round.temp.delta[i] == nil {
-		return round.WrapError(fmt.Errorf("nil temp.delta[%d]", i))
 	}
 
 	r3msg := NewSignRound3Message(
 		round.PartyID(),
 		round.temp.delta[i],
-		round.temp.d,
+		d,
 		proofs,
 	)
 	round.temp.signRound3Messages[i] = r3msg
@@ -129,18 +123,17 @@ func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss
 		return
 	}
 	ok = accmta.DecProofVerify(
-	    round.key.PaillierPKs[sender],
-	    round.Params().EC(),
-	    proofBeta[verifier],
-	    round.temp.cBeta[sender][recipient],
-	    round.temp.cBetaPrm[sender][recipient],
-	    round.key.GetRingPedersen(verifier),
+		round.key.PaillierPKs[sender],
+		round.Params().EC(),
+		proofBeta[verifier],
+		round.temp.cBeta[sender][recipient],
+		round.temp.cBetaPrm[sender][recipient],
+		round.key.GetRingPedersen(verifier),
 	)
 	if !ok {
 		errChs <- round.WrapError(fmt.Errorf("failed to verify proofBeta [%d][%d][%d]", sender, recipient, verifier))
 		return
 	}
-
 
 	proofDLs, err := r2msg.UnmarshalProofDL(round.Params().EC())
 	if err != nil || len(proofDLs) <= verifier {
@@ -159,7 +152,7 @@ func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss
 		round.temp.cA[recipient],
 		round.temp.cMu[sender][recipient],
 		round.temp.cNuPrm[sender][recipient],
-		round.temp.bigWs[sender], //recipient?
+		round.temp.bigWs[sender],
 		round.key.GetRingPedersen(verifier),
 	)
 	if !ok {
@@ -174,12 +167,12 @@ func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss
 		return
 	}
 	ok = accmta.DecProofVerify(
-	    round.key.PaillierPKs[sender],
-	    round.Params().EC(),
-	    proofNu[verifier],
-	    round.temp.cNu[sender][recipient],
-	    round.temp.cNuPrm[sender][recipient],
-	    round.key.GetRingPedersen(verifier),
+		round.key.PaillierPKs[sender],
+		round.Params().EC(),
+		proofNu[verifier],
+		round.temp.cNu[sender][recipient],
+		round.temp.cNuPrm[sender][recipient],
+		round.key.GetRingPedersen(verifier),
 	)
 	if !ok {
 		errChs <- round.WrapError(fmt.Errorf("failed to verify proofNu [%d][%d][%d]", sender, recipient, verifier))
@@ -221,30 +214,10 @@ func (round *round3) AliceEndP(sender int, wg *sync.WaitGroup, errChs chan *tss.
 		cB,
 		round.key.GetRingPedersen(i),
 	)
-	if !accmta.DecProofVerify(
-		round.key.PaillierPKs[sender],
-		round.Params().EC(),
-		proofBeta,
-		round.temp.cBeta[sender][i],
-		round.temp.cBetaPrm[sender][i],
-		round.key.GetRingPedersen(i),
-	) {
-		errChs <- round.WrapError(fmt.Errorf("DecProof does not verify [%d][%d]", sender, i))
-		round.temp.alpha[sender] = big.NewInt(1)
-		return
-	}
 	if err != nil {
 		errChs <- round.WrapError(fmt.Errorf("error getting alphaIJ [%d][%d] %v", sender, i, err))
 		round.temp.alpha[sender] = big.NewInt(1)
 		return
-	}
-	if alphaIj == nil {
-		errChs <- round.WrapError(fmt.Errorf("AliceEndP returned nil alphaIj [%d][%d]", sender, i))
-		round.temp.alpha[sender] = big.NewInt(1)
-		return
-	}
-	if alphaIj == nil {
-    	Logf("%d: AliceEndP fail round.temp.alpha[%d] == nil", i, sender)
 	}
 	round.temp.alpha[sender] = alphaIj
 }
@@ -291,10 +264,10 @@ func (round *round3) AliceEndDL(sender int, wg *sync.WaitGroup, errChs chan *tss
 
 func (round *round3) ComputeDs() {
 	for i, _ := range round.Parties().IDs() {
-        modN2 := common.ModInt(round.key.PaillierPKs[i].NSquare())
+		modN2 := common.ModInt(round.key.PaillierPKs[i].NSquare())
 		Di := round.temp.Xkgamma[i]
 		if Di == nil {
-		    return
+			return
 		}
 		for j := range round.Parties().IDs() {
 			if i == j {
@@ -321,26 +294,25 @@ func (round *round3) ComputeDelta() {
 	round.temp.delta[i] = delta
 }
 
-func (round *round3) ComputeProofs() (proofs []*zkproofs.DecProof, err *tss.Error) {
+func (round *round3) ComputeProofs() (*big.Int, []*zkproofs.DecProof, *tss.Error) {
 	round.ComputeDs()
 	round.ComputeDelta()
 	i := round.PartyID().Index
 	modQ := common.ModInt(round.Params().EC().Params().N)
 
 	if round.temp.delta[i] == nil {
-		return nil, round.WrapError(fmt.Errorf("%d could not compute Delta", i))
+		return nil, nil, round.WrapError(fmt.Errorf("%d could not compute Delta", i))
 	}
 
 	if round.temp.D[i] == nil {
-		return nil, round.WrapError(fmt.Errorf("%d could not compute D", i))
+		return nil, nil, round.WrapError(fmt.Errorf("%d could not compute D", i))
 	}
 
 	ski := round.key.PaillierSK
 	d, rho, errd := ski.DecryptFull(round.temp.D[i])
 	if errd != nil {
-		return nil, round.WrapError(fmt.Errorf("could not decrypt D"))
+		return nil, nil, round.WrapError(fmt.Errorf("could not decrypt D"))
 	}
-	round.temp.d = d
 
 	statement := &zkproofs.DecStatement{
 		Q:   round.Params().EC().Params().N,
@@ -355,7 +327,7 @@ func (round *round3) ComputeProofs() (proofs []*zkproofs.DecProof, err *tss.Erro
 	}
 	rpVs := round.key.GetAllRingPedersen()
 	rpVs[i] = nil
-	proofs = make([]*zkproofs.DecProof, len(rpVs))
+	proofs := make([]*zkproofs.DecProof, len(rpVs))
 	wg := sync.WaitGroup{}
 	for j, rp := range rpVs {
 		if j == i {
@@ -368,7 +340,7 @@ func (round *round3) ComputeProofs() (proofs []*zkproofs.DecProof, err *tss.Erro
 		}(j, rp)
 	}
 	wg.Wait()
-	return proofs, nil
+	return d, proofs, nil
 }
 
 func (round *round3) Update() (bool, *tss.Error) {

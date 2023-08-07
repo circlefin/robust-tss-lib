@@ -61,14 +61,14 @@ func TestMTA_P(t *testing.T) {
 
 	a := common.GetRandomPositiveInt(q)
 	ra := common.GetRandomPositiveInt(pkA.N)
-    Xk, err := pkA.EncryptWithRandomness(a, ra)
-    assert.NoError(t, err)
+	Xk, err := pkA.EncryptWithRandomness(a, ra)
+	assert.NoError(t, err)
 	b := common.GetRandomPositiveInt(q)
 
-
-	cA, pf, err := accmta.AliceInit(ec, pkA, a, ra, rpB)
+	rpVs := []*zkproofs.RingPedersenParams{rpA, rpA, nil, rpB}
+	cA, proofsA, err := accmta.AliceInit(ec, pkA, a, ra, rpVs)
 	assert.NoError(t, err)
-	assert.NotNil(t, pf)
+	assert.NotNil(t, proofsA)
 	assert.NotNil(t, cA)
 	assert.Equal(t, 0, Xk.Cmp(cA))
 	statementA := &zkproofs.EncStatement{
@@ -76,13 +76,17 @@ func TestMTA_P(t *testing.T) {
 		N0: pkA.N, // Alice's public key
 		EC: ec,    // max size of plaintext
 	}
-	verify := pf.Verify(statementA, rpB)
-	assert.True(t, verify)
+	for i, rp := range rpVs {
+		if i == 2 {
+			continue
+		}
+		assert.True(t, proofsA[i].Verify(statementA, rp))
+		assert.True(t, accmta.BobVerify(ec, pkA, proofsA[i], cA, rp))
+	}
 
-    rpVs := []*zkproofs.RingPedersenParams{rpA, rpA, nil, rpB}
-    cB, err := skB.Encrypt(b)
-    assert.NoError(t, err)
-	beta, cAlpha, cBeta, cBetaPrm, proofs, decProofs, err := accmta.BobRespondsP(ec, pkA, skB, pf, cB, cA, rpVs, rpB)
+	cB, err := skB.Encrypt(b)
+	assert.NoError(t, err)
+	beta, cAlpha, cBeta, cBetaPrm, proofs, decProofs, err := accmta.BobRespondsP(ec, pkA, skB, proofsA[3], cB, cA, rpVs, rpB)
 	assert.NoError(t, err)
 	assert.NotNil(t, beta)
 	assert.NotNil(t, cAlpha)
@@ -97,13 +101,13 @@ func TestMTA_P(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, common.ModInt(q).IsAdditiveInverse(beta, betaPrm))
 
-    for i, _ := range rpVs {
-        if rpVs[i] != nil  {
-            assert.NotNil(t, proofs[i])
-        }
-        assert.True(t, accmta.AliceVerifyP(ec, &skA.PublicKey, pkB, proofs[i], cA, cAlpha, cBetaPrm, cB, rpVs[i]))
-        assert.True(t, accmta.DecProofVerify(pkB, ec, decProofs[i], cBeta, cBetaPrm, rpVs[i]))
-    }
+	for i, _ := range rpVs {
+		if rpVs[i] != nil {
+			assert.NotNil(t, proofs[i])
+		}
+		assert.True(t, accmta.AliceVerifyP(ec, &skA.PublicKey, pkB, proofs[i], cA, cAlpha, cBetaPrm, cB, rpVs[i]))
+		assert.True(t, accmta.DecProofVerify(pkB, ec, decProofs[i], cBeta, cBetaPrm, rpVs[i]))
+	}
 	alpha, err := accmta.AliceEndP(ec, skA, pkB, proofs[0], decProofs[0], cA, cAlpha, cBeta, cBetaPrm, cB, rpA)
 	assert.NotNil(t, alpha)
 	assert.NoError(t, err)
@@ -115,36 +119,35 @@ func TestMTA_P(t *testing.T) {
 }
 
 func TestDecTest(t *testing.T) {
-    setUp(t)
-    modQ := common.ModInt(q)
-    zero := big.NewInt(0)
+	setUp(t)
+	modQ := common.ModInt(q)
+	zero := big.NewInt(0)
 
-    betaPrm := common.GetRandomPositiveInt(q)
-    beta := modQ.Sub(zero, betaPrm)
-    assert.True(t, modQ.IsCongruent(zero, modQ.Add(beta, betaPrm)))
+	betaPrm := common.GetRandomPositiveInt(q)
+	beta := modQ.Sub(zero, betaPrm)
+	assert.True(t, modQ.IsCongruent(zero, modQ.Add(beta, betaPrm)))
 
-    cBeta, _, _ := pkB.EncryptAndReturnRandomness(beta)
-    cBetaPrm, _, _ := pkB.EncryptAndReturnRandomness(betaPrm)
-    cZero, _ := pkB.HomoAdd(cBeta, cBetaPrm) // actually should be q
-    dZero, rho, _ := skB.DecryptFull(cZero)
-    assert.Equal(t, 0, dZero.Cmp(q))
-    assert.True(t, modQ.IsCongruent(dZero, zero))
+	cBeta, _, _ := pkB.EncryptAndReturnRandomness(beta)
+	cBetaPrm, _, _ := pkB.EncryptAndReturnRandomness(betaPrm)
+	cZero, _ := pkB.HomoAdd(cBeta, cBetaPrm) // actually should be q
+	dZero, rho, _ := skB.DecryptFull(cZero)
+	assert.Equal(t, 0, dZero.Cmp(q))
+	assert.True(t, modQ.IsCongruent(dZero, zero))
 
 	decStatement := &zkproofs.DecStatement{
-	    Q: q,
-	    Ell: zkproofs.GetEll(tss.EC()),
-	    N0: pkB.N,
-	    C: cZero,
-	    X: zero,
+		Q:   q,
+		Ell: zkproofs.GetEll(tss.EC()),
+		N0:  pkB.N,
+		C:   cZero,
+		X:   zero,
 	}
 	decWitness := &zkproofs.DecWitness{
-        Y: q,
-        Rho: rho,
+		Y:   q,
+		Rho: rho,
 	}
 	proof := zkproofs.NewDecProof(decWitness, decStatement, rpA)
 	assert.NotNil(t, proof)
 	assert.True(t, proof.Verify(decStatement, rpA))
-
 
 }
 
@@ -153,20 +156,32 @@ func TestMTA_DL(t *testing.T) {
 
 	a := common.GetRandomPositiveInt(q)
 	ra := common.GetRandomPositiveInt(pkA.N)
-    Xk, err := pkA.EncryptWithRandomness(a, ra)
-    assert.NoError(t, err)
+	Xk, err := pkA.EncryptWithRandomness(a, ra)
+	assert.NoError(t, err)
 	b := common.GetRandomPositiveInt(q)
 
-	cA, pf, err := accmta.AliceInit(ec, pkA, a, ra, rpB)
+	rpVs := []*zkproofs.RingPedersenParams{rpA, rpA, nil, rpB}
+	cA, proofsA, err := accmta.AliceInit(ec, pkA, a, ra, rpVs)
 	assert.NoError(t, err)
-	assert.NotNil(t, pf)
+	assert.NotNil(t, proofsA)
 	assert.NotNil(t, cA)
 	assert.Equal(t, 0, Xk.Cmp(cA))
+	statementA := &zkproofs.EncStatement{
+		K:  cA,    // Alice's ciphertext
+		N0: pkA.N, // Alice's public key
+		EC: ec,    // max size of plaintext
+	}
+	for i, rp := range rpVs {
+		if i == 2 {
+			continue
+		}
+		assert.True(t, proofsA[i].Verify(statementA, rp))
+		assert.True(t, accmta.BobVerify(ec, pkA, proofsA[i], cA, rp))
+	}
 
-    rpVs := []*zkproofs.RingPedersenParams{rpA, rpA, nil, rpB}
 	B := crypto.ScalarBaseMult(ec, b)
 	assert.NoError(t, err)
-	beta, cAlpha, cBeta, cBetaPrm, proofs, decProofs, err := accmta.BobRespondsDL(ec, pkA, skB, pf, b, cA, rpVs, rpB, B)
+	beta, cAlpha, cBeta, cBetaPrm, proofs, decProofs, err := accmta.BobRespondsDL(ec, pkA, skB, proofsA[3], b, cA, rpVs, rpB, B)
 	assert.NoError(t, err)
 	assert.NotNil(t, beta)
 	assert.NotNil(t, cAlpha)
@@ -174,13 +189,13 @@ func TestMTA_DL(t *testing.T) {
 	assert.NotNil(t, proofs)
 	assert.Equal(t, len(rpVs), len(proofs))
 
-    for i, _ := range rpVs {
-        if rpVs[i] != nil  {
-            assert.NotNil(t, proofs[i])
-        }
-        assert.True(t, accmta.AliceVerifyDL(ec, &skA.PublicKey, pkB, proofs[i], cA, cAlpha, cBetaPrm, B, rpVs[i]))
-        assert.True(t, accmta.DecProofVerify(pkB, ec, decProofs[i], cBeta, cBetaPrm, rpVs[i]))
-    }
+	for i, _ := range rpVs {
+		if rpVs[i] != nil {
+			assert.NotNil(t, proofs[i])
+		}
+		assert.True(t, accmta.AliceVerifyDL(ec, &skA.PublicKey, pkB, proofs[i], cA, cAlpha, cBetaPrm, B, rpVs[i]))
+		assert.True(t, accmta.DecProofVerify(pkB, ec, decProofs[i], cBeta, cBetaPrm, rpVs[i]))
+	}
 	alpha, err := accmta.AliceEndDL(ec, skA, pkB, proofs[0], decProofs[0], cA, cAlpha, cBeta, cBetaPrm, B, rpA)
 	assert.NotNil(t, alpha)
 	assert.NoError(t, err)

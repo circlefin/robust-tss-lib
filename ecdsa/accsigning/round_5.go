@@ -1,5 +1,4 @@
 // Copyright 2023 Circle
-//
 
 package accsigning
 
@@ -10,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/bnb-chain/tss-lib/common"
-	//	"github.com/bnb-chain/tss-lib/crypto"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -22,6 +20,12 @@ func (round *round5) Start() *tss.Error {
 	round.number = 5
 	round.started = true
 	round.resetOK()
+
+	// The check that temp.m = hash(msg) is in Zq is delayed to round 5 to allow
+	// presigning bulk computation of rounds 1-4.
+	if round.temp.m.Cmp(round.Params().EC().Params().N) >= 0 {
+		return round.WrapError(errors.New("hashed message is not valid"))
+	}
 
 	err := round.VerifyRound4Messages()
 	if err != nil {
@@ -46,6 +50,7 @@ func (round *round5) Start() *tss.Error {
 	round.temp.signRound5Messages[round.PartyID().Index] = r5msg
 	round.out <- r5msg
 
+	round.temp.CleanUpPreSigningData()
 	return nil
 }
 
@@ -86,12 +91,9 @@ func (round *round5) VerifyRound4Messages() *tss.Error {
 	}
 	wg.Wait()
 	close(errChs)
-	culprits := make([]*tss.PartyID, 0, len(round.Parties().IDs()))
-	for err := range errChs {
-		culprits = append(culprits, err.Culprits()...)
-	}
-	if len(culprits) > 0 {
-		return round.WrapError(errors.New("Failed to verify round 4 messages"), culprits...)
+	err := round.WrapErrorChs(round.PartyID(), errChs, "Failed to verify round 4 messages")
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -159,8 +161,8 @@ func (round *round5) ComputeSi() (err *tss.Error) {
 			if j == round.PartyID().Index {
 				continue
 			}
-    		temp := modQ.Add(round.temp.mu[j], round.temp.nu[j])
-    		sigma = modQ.Add(sigma, temp)
+			temp := modQ.Add(round.temp.mu[j], round.temp.nu[j])
+			sigma = modQ.Add(sigma, temp)
 		}
 		round.temp.sigma = sigma
 	}()
@@ -168,7 +170,7 @@ func (round *round5) ComputeSi() (err *tss.Error) {
 	if err != nil {
 		return err
 	}
-    round.temp.si = modQ.Add(modQ.Mul(round.temp.m, round.temp.k), modQ.Mul(round.temp.rx, round.temp.sigma))
+	round.temp.si = modQ.Add(modQ.Mul(round.temp.m, round.temp.k), modQ.Mul(round.temp.rx, round.temp.sigma))
 	return nil
 }
 

@@ -21,8 +21,8 @@ func (round *round4) Start() *tss.Error {
 	round.started = true
 	round.resetOK()
 
- 	partyCount := len(round.Parties().IDs())
- 	errChs := make(chan *tss.Error, partyCount*partyCount*3)
+	partyCount := len(round.Parties().IDs())
+	errChs := make(chan *tss.Error, partyCount*partyCount*3)
 	round.VerifyRound3Messages(errChs)
 	close(errChs)
 	err := round.WrapErrorChs(round.PartyID(), errChs, "Failed to process round 3 messages")
@@ -109,7 +109,6 @@ func (round *round4) ComputeFinalDelta() *tss.Error {
 		}
 		delta = modN.Add(delta, deltaJ)
 	}
-	round.temp.finalDelta = delta
 	round.temp.finalDeltaInv = modN.ModInverse(delta)
 	return nil
 }

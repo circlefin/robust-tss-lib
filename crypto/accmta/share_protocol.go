@@ -22,10 +22,16 @@ func AliceInit(
 	pkA *paillier.PublicKey,
 	// Alice secret
 	a, rA *big.Int,
-	// Bob's Ring Pedersen parameters
-	rpB *zkproofs.RingPedersenParams,
-) (cA *big.Int, pf *zkproofs.EncProof, err error) {
-    cA, err = pkA.EncryptWithRandomness(a, rA)
+	// Verifier Ring Pedersen parameters
+	rpV []*zkproofs.RingPedersenParams,
+) (*big.Int, []*zkproofs.EncProof, error) {
+	ell := zkproofs.GetEll(ec)
+	if !zkproofs.NewEll(ell).InRange(a) {
+		err := errors.New("a out of range")
+		return nil, nil, err
+	}
+
+	cA, err := pkA.EncryptWithRandomness(a, rA)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -33,26 +39,31 @@ func AliceInit(
 		K:   a,  // plaintext
 		Rho: rA, // randomness
 	}
-	ell := zkproofs.GetEll(ec)
 	statement := &zkproofs.EncStatement{
 		K:  cA,    // ciphertext
 		N0: pkA.N, // public key to ciphertext
 		EC: ec,    // elliptic curve
 	}
 
-	pf, err = zkproofs.NewEncProof(witness, statement, rpB)
+	wg := sync.WaitGroup{}
+	wg.Add(len(rpV))
+	proofs := make([]*zkproofs.EncProof, len(rpV))
+	err = nil
+	for i, rp := range rpV {
+		go func(i int, rp *zkproofs.RingPedersenParams) {
+			defer wg.Done()
+			if rp == nil {
+				proofs[i] = nil
+				return
+			}
+			proofs[i], err = zkproofs.NewEncProof(witness, statement, rp)
+		}(i, rp)
+	}
+	wg.Wait()
 	if err != nil {
 		return nil, nil, err
 	}
-	if !zkproofs.NewEll(ell).InRange(a) {
-		err = errors.New("a out of range")
-		return nil, nil, err
-	}
-	if !pf.Verify(statement, rpB) {
-		err = errors.New("bad proof")
-		return nil, nil, err
-	}
-	return cA, pf, nil
+	return cA, proofs, nil
 }
 
 func BobRespondsP(
@@ -108,10 +119,10 @@ func BobRespondsP(
 	statement := &zkproofs.AffPStatement{
 		C:        cA,                  // Alice's ciphertext
 		D:        cAlpha,              // affine transform of Alice's ciphertext: cA(*)b + betaPrm
-		X:        cB,                   // encryption of b using Bob's public key
-		Y:        cBetaPrm,                   // encryption of betaPrm
+		X:        cB,                  // encryption of b using Bob's public key
+		Y:        cBetaPrm,            // encryption of betaPrm
 		N0:       pkA.N,               // Alice's public key
-		N1:       skB.PublicKey.N,               // Bob's public key
+		N1:       skB.PublicKey.N,     // Bob's public key
 		Ell:      zkproofs.GetEll(ec), // max size of plaintext
 		EllPrime: zkproofs.GetEll(ec), // max size of plaintext
 		EC:       ec,                  // elliptic curve
@@ -124,7 +135,7 @@ func BobRespondsP(
 	}
 	decProofs, err = DecProofs(skB, ec, cBeta, cBetaPrm, rpV)
 	if err != nil {
-	    return
+		return
 	}
 
 	wg := sync.WaitGroup{}
@@ -153,8 +164,8 @@ func BobVerify(
 	proofAlice *zkproofs.EncProof,
 	// Alice's encryption of a under pkA
 	cA *big.Int,
-	// Bob's Ring Pedersen parameters
-	rpB *zkproofs.RingPedersenParams,
+	// Verifier's Ring Pedersen parameters
+	rpV *zkproofs.RingPedersenParams,
 ) bool {
 	// check Alice's proof
 	statementA := &zkproofs.EncStatement{
@@ -162,7 +173,7 @@ func BobVerify(
 		N0: pkA.N, // Alice's public key
 		EC: ec,    // max size of plaintext
 	}
-	return proofAlice.Verify(statementA, rpB)
+	return proofAlice.Verify(statementA, rpV)
 }
 
 func BobRespondsDL(
@@ -215,11 +226,11 @@ func BobRespondsDL(
 	}
 	statement := &zkproofs.AffGStatement{
 		C:        cA,                  // Alice's ciphertext
-		D:        cAlpha,                  // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+		D:        cAlpha,              // affine transform of Alice's ciphertext: cA(*)b + betaPrm
 		X:        B,                   // B = g^b is a DL commitment to Bob's input b
-		Y:        cBetaPrm,                   // encryption of betaPrm
+		Y:        cBetaPrm,            // encryption of betaPrm
 		N0:       pkA.N,               // Alice's public key
-		N1:       skB.PublicKey.N,               // Bob's public key
+		N1:       skB.PublicKey.N,     // Bob's public key
 		Ell:      zkproofs.GetEll(ec), // max size of plaintext
 		EllPrime: zkproofs.GetEll(ec), // max size of plaintext
 	}
@@ -231,7 +242,7 @@ func BobRespondsDL(
 	}
 	decProofs, err = DecProofs(skB, ec, cBeta, cBetaPrm, rpV)
 	if err != nil {
-	    return
+		return
 	}
 
 	wg := sync.WaitGroup{}
@@ -251,8 +262,8 @@ func BobRespondsDL(
 			proofs[i] = proof
 		}(i, rp)
 	}
-    wg.Wait()
-    return
+	wg.Wait()
+	return
 }
 
 func AliceEndP(
@@ -269,10 +280,10 @@ func AliceEndP(
 	// Alice's Ring Pedersen parameters
 	rpA *zkproofs.RingPedersenParams,
 ) (*big.Int, error) {
-    if ! AliceVerifyP(ec, &skA.PublicKey, pkB, proof, cA, cAlpha, cBetaPrm, cB, rpA) {
+	if !AliceVerifyP(ec, &skA.PublicKey, pkB, proof, cA, cAlpha, cBetaPrm, cB, rpA) {
 		return nil, errors.New("AffPProof.Verify() returned false")
 	}
-    if ! DecProofVerify(pkB, ec, decproof, cBeta, cBetaPrm, rpA) {
+	if !DecProofVerify(pkB, ec, decproof, cBeta, cBetaPrm, rpA) {
 		return nil, errors.New("DecProof.Verify() returned false")
 	}
 	alphaPrm, err := skA.Decrypt(cAlpha)
@@ -296,9 +307,9 @@ func AliceVerifyP(
 	// Verifier's Ring Pedersen parameters
 	rpV *zkproofs.RingPedersenParams,
 ) bool {
-    if rpV == nil {
-        return true
-    }
+	if rpV == nil {
+		return true
+	}
 	statement := &zkproofs.AffPStatement{
 		C:        cA,                  // Alice's ciphertext
 		D:        cAlpha,              // affine transform of Alice's ciphertext: cA(*)b + betaPrm
@@ -316,7 +327,6 @@ func AliceVerifyP(
 	return true
 }
 
-
 func AliceEndDL(
 	ec elliptic.Curve,
 	// Alice's Paillier keys
@@ -332,11 +342,11 @@ func AliceEndDL(
 	// Alice's Ring Pedersen parameters
 	rpA *zkproofs.RingPedersenParams,
 ) (*big.Int, error) {
-    if ! AliceVerifyDL(ec, &skA.PublicKey, pkB, proof, cA, cAlpha, cBetaPrm, B, rpA) {
+	if !AliceVerifyDL(ec, &skA.PublicKey, pkB, proof, cA, cAlpha, cBetaPrm, B, rpA) {
 		return nil, errors.New("AffGProof.Verify() returned false")
 	}
 
-    if ! DecProofVerify(pkB, ec, decproof, cBeta, cBetaPrm, rpA) {
+	if !DecProofVerify(pkB, ec, decproof, cBeta, cBetaPrm, rpA) {
 		return nil, errors.New("DecProof.Verify() returned false")
 	}
 
@@ -362,15 +372,15 @@ func AliceVerifyDL(
 	// Verifier's Ring Pedersen parameters
 	rpV *zkproofs.RingPedersenParams,
 ) bool {
-    if rpV == nil {
-        return true
-    }
+	if rpV == nil {
+		return true
+	}
 	statement := &zkproofs.AffGStatement{
 		C:        cA,                  // Alice's ciphertext
-		D:        cAlpha,                  // affine transform of Alice's ciphertext: cA(*)b + betaPrm
+		D:        cAlpha,              // affine transform of Alice's ciphertext: cA(*)b + betaPrm
 		X:        B,                   // B = g^b is a DL commitment to Bob's input b
-		Y:        cBetaPrm,             // encryption of betaPrm
-		N0:       pkA.N,     // Alice's public key
+		Y:        cBetaPrm,            // encryption of betaPrm
+		N0:       pkA.N,               // Alice's public key
 		N1:       pkB.N,               // Bob's public key
 		Ell:      zkproofs.GetEll(ec), // max size of plaintext
 		EllPrime: zkproofs.GetEll(ec), // max size of plaintext
@@ -380,28 +390,28 @@ func AliceVerifyDL(
 }
 
 func DecProofs(sk *paillier.PrivateKey, ec elliptic.Curve, cBeta, cBetaPrm *big.Int, rpV []*zkproofs.RingPedersenParams) ([]*zkproofs.DecProof, error) {
-    cQ, err := sk.PublicKey.HomoAdd(cBeta, cBetaPrm)
-    if err != nil {
-        return nil, err
-    }
+	cQ, err := sk.PublicKey.HomoAdd(cBeta, cBetaPrm)
+	if err != nil {
+		return nil, err
+	}
 
-    dQ, rho, err := sk.DecryptFull(cQ)
-    if err != nil {
-        return nil, err
-    }
+	dQ, rho, err := sk.DecryptFull(cQ)
+	if err != nil {
+		return nil, err
+	}
 
 	statement := &zkproofs.DecStatement{
-	    Q: ec.Params().N,
-	    Ell: zkproofs.GetEll(ec),
-	    N0: sk.PublicKey.N,
-	    C: cQ,
-	    X: big.NewInt(0),
+		Q:   ec.Params().N,
+		Ell: zkproofs.GetEll(ec),
+		N0:  sk.PublicKey.N,
+		C:   cQ,
+		X:   big.NewInt(0),
 	}
 	witness := &zkproofs.DecWitness{
-        Y: dQ,
-        Rho: rho,
+		Y:   dQ,
+		Rho: rho,
 	}
-    proofs := make([]*zkproofs.DecProof, len(rpV))
+	proofs := make([]*zkproofs.DecProof, len(rpV))
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(rpV))
@@ -417,26 +427,25 @@ func DecProofs(sk *paillier.PrivateKey, ec elliptic.Curve, cBeta, cBetaPrm *big.
 		}(i, rp)
 	}
 	wg.Wait()
-    return proofs, nil
+	return proofs, nil
 }
 
 func DecProofVerify(pk *paillier.PublicKey, ec elliptic.Curve, proof *zkproofs.DecProof, cBeta, cBetaPrm *big.Int, rp *zkproofs.RingPedersenParams) bool {
-    if rp == nil {
-        return true
-    }
+	if rp == nil {
+		return true
+	}
 
-    cQ, err := pk.HomoAdd(cBeta, cBetaPrm)
-    if err != nil {
-        return false
-    }
+	cQ, err := pk.HomoAdd(cBeta, cBetaPrm)
+	if err != nil {
+		return false
+	}
 	statement := &zkproofs.DecStatement{
-	    Q: ec.Params().N,
-	    Ell: zkproofs.GetEll(ec),
-	    N0: pk.N,
-	    C: cQ,
-	    X: big.NewInt(0),
+		Q:   ec.Params().N,
+		Ell: zkproofs.GetEll(ec),
+		N0:  pk.N,
+		C:   cQ,
+		X:   big.NewInt(0),
 	}
 
 	return proof.Verify(statement, rp)
 }
-

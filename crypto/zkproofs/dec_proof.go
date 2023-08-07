@@ -120,7 +120,7 @@ func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 	// check (1+N0)^z1 * w^N0 mod N02 == A * C^e mod N02
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
 	N0plus1 := new(big.Int).Add(stmt.N0, big.NewInt(1))
-    left1 := PseudoPaillierEncrypt(N0plus1, proof.Z1, proof.W, stmt.N0, N02)
+	left1 := PseudoPaillierEncrypt(N0plus1, proof.Z1, proof.W, stmt.N0, N02)
 	right1 := ATimesBToTheCModN(proof.A, stmt.C, e, N02)
 	if left1.Cmp(right1) != 0 {
 		return false

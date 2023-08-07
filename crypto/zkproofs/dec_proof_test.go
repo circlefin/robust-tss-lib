@@ -1,7 +1,7 @@
 package zkproofs_test
 
 import (
-    "math/big"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,8 +40,8 @@ func TestDecProof(t *testing.T) {
 }
 
 func GenerateDecProofData(t *testing.T) (*zkproofs.DecWitness, *zkproofs.DecStatement) {
-    y := common.GetRandomPositiveInt(publicKey.N)
-    x := new(big.Int).Mod(y, q)
+	y := common.GetRandomPositiveInt(publicKey.N)
+	x := new(big.Int).Mod(y, q)
 	witness := &zkproofs.DecWitness{
 		Y:   y,
 		Rho: common.GetRandomPositiveInt(publicKey.N),

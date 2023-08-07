@@ -166,7 +166,7 @@ func (publicKey *PublicKey) HomoMultInv(c1 *big.Int) (*big.Int, error) {
 		return nil, ErrMessageTooLong
 	}
 	// cipher^m mod N2
-    return common.ModInt(N2).Exp(c1, big.NewInt(-1)), nil
+	return common.ModInt(N2).Exp(c1, big.NewInt(-1)), nil
 }
 
 func (publicKey *PublicKey) HomoAdd(c1, c2 *big.Int) (*big.Int, error) {

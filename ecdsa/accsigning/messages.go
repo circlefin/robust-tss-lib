@@ -19,18 +19,12 @@ var (
 		(*SignRound2Message)(nil),
 		(*SignRound3Message)(nil),
 		(*SignRound4Message)(nil),
-		/*(*SignRound5Message)(nil),
-		(*SignRound6Message)(nil),
-		(*SignRound7Message)(nil),
-		(*SignRound8Message)(nil),
-		(*SignRound9Message)(nil),*/
 	}
 )
 
 func NewSignRound1Message1(
 	to, from *tss.PartyID,
 	proofAlice *zkproofs.EncProof,
-	proofXk *zkproofs.EncProof,
 	proofXgamma *zkproofs.EncProof,
 	proofXkw *zkproofs.MulStarProof,
 ) tss.ParsedMessage {
@@ -40,12 +34,10 @@ func NewSignRound1Message1(
 		IsBroadcast: false,
 	}
 	pa := proofAlice.Bytes()
-	pXk := proofXk.Bytes()
 	pXg := proofXgamma.Bytes()
 	pXkw := proofXkw.Bytes()
 	content := &SignRound1Message1{
 		RangeProofAlice: pa[:],
-		ProofXK:         pXk[:],
 		ProofXGamma:     pXg[:],
 		ProofXKw:        pXkw[:],
 	}
@@ -56,17 +48,12 @@ func NewSignRound1Message1(
 func (m *SignRound1Message1) ValidateBasic() bool {
 	return m != nil &&
 		common.NonEmptyMultiBytes(m.GetRangeProofAlice(), zkproofs.EncProofParts) &&
-		common.NonEmptyMultiBytes(m.GetProofXK(), zkproofs.EncProofParts) &&
 		common.NonEmptyMultiBytes(m.GetProofXGamma(), zkproofs.EncProofParts) &&
 		common.NonEmptyMultiBytes(m.GetProofXKw(), zkproofs.MulStarProofParts)
 }
 
 func (m *SignRound1Message1) UnmarshalRangeProofAlice() (*zkproofs.EncProof, error) {
 	return zkproofs.EncProofFromBytes(m.GetRangeProofAlice())
-}
-
-func (m *SignRound1Message1) UnmarshalProofXK() (*zkproofs.EncProof, error) {
-	return zkproofs.EncProofFromBytes(m.GetProofXK())
 }
 
 func (m *SignRound1Message1) UnmarshalProofXGamma() (*zkproofs.EncProof, error) {

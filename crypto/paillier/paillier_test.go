@@ -136,17 +136,17 @@ func TestHomoMulAndReturnRandomness(t *testing.T) {
 }
 
 func TestMultInv(t *testing.T) {
- 	setUp(t)
- 	num := big.NewInt(2343)
- 	zero := big.NewInt(0)
+	setUp(t)
+	num := big.NewInt(2343)
+	zero := big.NewInt(0)
 
- 	cipher, _ := publicKey.Encrypt(num)
- 	inv, _ := publicKey.HomoMultInv(cipher)
- 	negNum, _ := privateKey.Decrypt(inv)
- 	actual := common.ModInt(publicKey.N).Add(num, negNum)
- 	assert.True(t, common.ModInt(publicKey.N).IsCongruent(zero, actual))
- 	assert.True(t, common.ModInt(publicKey.N).IsAdditiveInverse(num, negNum))
- }
+	cipher, _ := publicKey.Encrypt(num)
+	inv, _ := publicKey.HomoMultInv(cipher)
+	negNum, _ := privateKey.Decrypt(inv)
+	actual := common.ModInt(publicKey.N).Add(num, negNum)
+	assert.True(t, common.ModInt(publicKey.N).IsCongruent(zero, actual))
+	assert.True(t, common.ModInt(publicKey.N).IsAdditiveInverse(num, negNum))
+}
 
 func TestHomoAdd(t *testing.T) {
 	setUp(t)
