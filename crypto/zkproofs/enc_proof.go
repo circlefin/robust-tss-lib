@@ -161,8 +161,16 @@ func (proof *EncProof) Nil() bool {
 	return false
 }
 
-func (proof *EncProof) Bytes() [EncProofParts][]byte {
-	return [...][]byte{
+func (proof *EncProof) IsNil() bool {
+	return proof == nil
+}
+
+func (proof *EncProof) Parts() int {
+	return EncProofParts
+}
+
+func (proof *EncProof) Bytes() [][]byte {
+	return [][]byte{
 		proof.S.Bytes(),
 		proof.A.Bytes(),
 		proof.C.Bytes(),
@@ -172,7 +180,7 @@ func (proof *EncProof) Bytes() [EncProofParts][]byte {
 	}
 }
 
-func EncProofFromBytes(bzs [][]byte) (*EncProof, error) {
+func (proof *EncProof) ProofFromBytes(ec elliptic.Curve, bzs [][]byte) (Proof, error) {
 	if !common.NonEmptyMultiBytes(bzs, EncProofParts) {
 		return nil, fmt.Errorf("expected %d byte parts to construct EncProof", EncProofParts)
 	}

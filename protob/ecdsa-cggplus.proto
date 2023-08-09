@@ -1,0 +1,17 @@
+// Copyright 2023 Circle
+//
+
+
+syntax = "proto3";
+package binance.tsslib.ecdsa.cggplus;
+option go_package = "ecdsa/cggplus";
+
+/*
+ * Represents a P2P message sent to each party during Round 1 of the Accountable ECDSA TSS signing protocol.
+ */
+message SignRound1Message {
+    bytes bigG = 1;
+    bytes bigK = 2;
+    repeated bytes psi = 3;
+}
+

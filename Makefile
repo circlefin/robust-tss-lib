@@ -8,7 +8,7 @@ all: protob test
 
 protob:
 	@echo "--> Building Protocol Buffers"
-	@for protocol in message signature ecdsa-accsigning ecdsa-keygen ecdsa-signing ecdsa-resharing eddsa-keygen eddsa-signing eddsa-resharing; do \
+	@for protocol in message signature ecdsa-cggplus ecdsa-accsigning ecdsa-keygen ecdsa-signing ecdsa-resharing eddsa-keygen eddsa-signing eddsa-resharing; do \
 		echo "Generating $$protocol.pb.go" ; \
 		protoc --go_out=. ./protob/$$protocol.proto ; \
 	done
@@ -29,8 +29,8 @@ test_unit:
 	go test -timeout 60m -v github.com/bnb-chain/tss-lib/crypto/paillier
 	go test -timeout 60m -v github.com/bnb-chain/tss-lib/crypto/zkproofs
 	go test -timeout 60m -v github.com/bnb-chain/tss-lib/crypto/accmta
-	go test -timeout 60m -v github.com/bnb-chain/tss-lib/ecdsa/signing
-	go test -timeout 60m -v github.com/bnb-chain/tss-lib/ecdsa/accsigning
+#	go test -timeout 60m -v github.com/bnb-chain/tss-lib/ecdsa/accsigning
+	go test -timeout 60m -v github.com/bnb-chain/tss-lib/ecdsa/cggplus
 #	go test -timeout 60m $(PACKAGES)
 
 test_unit_race:

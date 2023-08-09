@@ -87,7 +87,8 @@ func TestEncProofBytes(t *testing.T) {
 
 	proofBytes := proof.Bytes()
 	var proofInBytes [][]byte = proofBytes[:]
-	newProof, err := zkproofs.EncProofFromBytes(proofInBytes)
+	np, err := new(zkproofs.EncProof).ProofFromBytes(ec, proofInBytes)
+	newProof := np.(*zkproofs.EncProof)
 	assert.NoError(t, err)
 	assert.NotNil(t, newProof)
 	assert.False(t, newProof.Nil())

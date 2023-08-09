@@ -4,7 +4,7 @@
 // terms governing use, modification, and redistribution, is contained in the
 // file LICENSE at the root of the source code distribution tree.
 
-package accsigning
+package cggplus
 
 import (
 	"errors"
@@ -38,8 +38,7 @@ type (
 	}
 
 	localMessageStore struct {
-		signRound1Message1s,
-		signRound1Message2s,
+		signRound1Messages,
 		signRound3Messages,
 		signRound4Messages,
 		signRound5Messages,
@@ -49,21 +48,21 @@ type (
 
 	localTempData struct {
 		localMessageStore
-
+        m,
 		// round 1 - all data except bigWs removed in round 5
 		keyDerivationDelta,
 		w,
 		k,
 		gamma,
-		rhoxgamma *big.Int
-		Xgamma,
-		Xkgamma,
-		Xkw,
-		cA []*big.Int // [sender] -> self
-		bigWs,
-		pointGamma []*crypto.ECPoint // [sender] -> self
+		rho,
+		nu *big.Int
+		bigG,
+		bigK []*big.Int // [sender] -> self
+		bigWs []*crypto.ECPoint // [sender] -> self
 
+/*
 		// round 2
+pointGamma []*crypto.ECPoint // [sender] -> self
 		beta,
 		nu []*big.Int // self -> [receiver]
 		cAlpha,
@@ -89,7 +88,7 @@ type (
 		si,
 		rx,
 		ry *big.Int
-		bigR *crypto.ECPoint
+		bigR *crypto.ECPoint */
 	}
 )
 
@@ -98,14 +97,12 @@ func (temp *localTempData) CleanUpPreSigningData() {
 	temp.w = nil
 	temp.k = nil
 	temp.gamma = nil
-	temp.rhoxgamma = nil
-	temp.Xgamma = nil
-	temp.Xkgamma = nil
-	temp.Xkw = nil
-	temp.cA = nil
+	temp.rho = nil
+	temp.nu = nil
+	temp.bigG = nil
+	temp.bigK = nil
 	//		leave bigWs
-	temp.pointGamma = nil
-
+/*
 	// round 2
 	temp.beta = nil
 	temp.nu = nil
@@ -123,7 +120,7 @@ func (temp *localTempData) CleanUpPreSigningData() {
 	temp.mu = nil
 
 	// round 4
-	temp.finalDeltaInv = nil
+	temp.finalDeltaInv = nil*/
 }
 
 func NewLocalParty(
@@ -155,26 +152,25 @@ func NewLocalPartyWithKDD(
 		end:       end,
 	}
 	// msgs init
-	p.temp.signRound1Message1s = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound1Message2s = make([]tss.ParsedMessage, partyCount)
+	p.temp.signRound1Messages = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound2Messages = Make2DParsedMessage(partyCount)
-	p.temp.signRound3Messages = make([]tss.ParsedMessage, partyCount)
+/*	p.temp.signRound3Messages = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound4Messages = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound5Messages = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound6Messages = make([]tss.ParsedMessage, partyCount)
+	p.temp.signRound7Messages = make([]tss.ParsedMessage, partyCount)
+	p.temp.signRound8Messages = make([]tss.ParsedMessage, partyCount)
+	p.temp.signRound9Messages = make([]tss.ParsedMessage, partyCount)*/
 
 	// temp data init
 	p.temp.keyDerivationDelta = keyDerivationDelta
 	p.temp.m = msg
 
 	// round 1
-	p.temp.Xkw = make([]*big.Int, partyCount)
-	p.temp.Xgamma = make([]*big.Int, partyCount)
-	p.temp.Xkgamma = make([]*big.Int, partyCount)
-	p.temp.cA = make([]*big.Int, partyCount)
+	p.temp.bigK = make([]*big.Int, partyCount)
+	p.temp.bigG = make([]*big.Int, partyCount)
 	p.temp.bigWs = make([]*crypto.ECPoint, partyCount)
-	p.temp.pointGamma = make([]*crypto.ECPoint, partyCount)
-
+/*
 	// round 2
 	p.temp.cAlpha = Make2DSlice[*big.Int](partyCount)
 	p.temp.cBeta = Make2DSlice[*big.Int](partyCount)
@@ -192,7 +188,7 @@ func NewLocalPartyWithKDD(
 	p.temp.delta = make([]*big.Int, partyCount)
 
 	p.temp.bigS = make([]*big.Int, partyCount)
-
+*/
 	return p
 }
 
@@ -263,11 +259,9 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 	// switch/case is necessary to store any messages beyond current round
 	// this does not handle message replays. we expect the caller to apply replay and spoofing protection.
 	switch msg.Content().(type) {
-	case *SignRound1Message1:
-		p.temp.signRound1Message1s[fromPIdx] = msg
-	case *SignRound1Message2:
-		p.temp.signRound1Message2s[fromPIdx] = msg
-	case *SignRound2Message:
+	case *SignRound1Message:
+		p.temp.signRound1Messages[fromPIdx] = msg
+/*	case *SignRound2Message:
 		r2msg := msg.Content().(*SignRound2Message)
 		toPIdx := r2msg.UnmarshalRecipient()
 		p.temp.signRound2Messages[fromPIdx][toPIdx] = msg
@@ -276,7 +270,7 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 	case *SignRound4Message:
 		p.temp.signRound4Messages[fromPIdx] = msg
 	case *SignRound5Message:
-		p.temp.signRound5Messages[fromPIdx] = msg
+		p.temp.signRound5Messages[fromPIdx] = msg */
 	default: // unrecognised message, just ignore!
 		common.Logger.Warningf("unrecognised message ignored: %v", msg)
 		return false, nil
