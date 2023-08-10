@@ -123,6 +123,17 @@ func (publicKey *PublicKey) EncryptWithRandomness(m *big.Int, x *big.Int) (c *bi
 	return
 }
 
+func (publicKey *PublicKey) EncryptWithRandomnessNoErrChk(m *big.Int, x *big.Int) (c *big.Int) {
+	N2 := publicKey.NSquare()
+	// 1. gamma^m mod N2
+	Gm := new(big.Int).Exp(publicKey.Gamma(), m, N2)
+	// 2. x^N mod N2
+	xN := new(big.Int).Exp(x, publicKey.N, N2)
+	// 3. (1) * (2) mod N2
+	c = common.ModInt(N2).Mul(Gm, xN)
+	return
+}
+
 func (publicKey *PublicKey) EncryptAndReturnRandomness(m *big.Int) (c *big.Int, x *big.Int, err error) {
 	x = common.GetRandomPositiveRelativelyPrimeInt(publicKey.N)
 	c, err = publicKey.EncryptWithRandomness(m, x)
