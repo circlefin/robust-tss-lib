@@ -60,18 +60,19 @@ type (
 		bigK []*big.Int // [sender] -> self
 		bigWs []*crypto.ECPoint // [sender] -> self
 
-/*
-		// round 2
-pointGamma []*crypto.ECPoint // [sender] -> self
-		beta,
-		nu []*big.Int // self -> [receiver]
-		cAlpha,
-		cBeta,
-		cBetaPrm,
-		cMu,
-		cNu,
-		cNuPrm [][]*big.Int // [sender][receiver]
 
+		// round 2
+        pointGamma []*crypto.ECPoint // [sender] -> self
+        beta,
+        betaHat,
+        bigF,
+        bigFHat,
+        bigD,
+        bigDHat [][]*big.Int // [sender][receiver]
+//        psi,
+//        psihat [][][]*zkproofs.AffGProof // [sender][receiver][verifier]
+//        psiprime [][][]*zkproofs.LogStarProof // [sender][receiver][verifier]
+/*
 		// round 3
 		delta,
 		D,
@@ -170,18 +171,17 @@ func NewLocalPartyWithKDD(
 	p.temp.bigK = make([]*big.Int, partyCount)
 	p.temp.bigG = make([]*big.Int, partyCount)
 	p.temp.bigWs = make([]*crypto.ECPoint, partyCount)
-/*
-	// round 2
-	p.temp.cAlpha = Make2DSlice[*big.Int](partyCount)
-	p.temp.cBeta = Make2DSlice[*big.Int](partyCount)
-	p.temp.cBetaPrm = Make2DSlice[*big.Int](partyCount)
-	p.temp.cMu = Make2DSlice[*big.Int](partyCount)
-	p.temp.cNu = Make2DSlice[*big.Int](partyCount)
-	p.temp.cNuPrm = Make2DSlice[*big.Int](partyCount)
-	p.temp.beta = make([]*big.Int, partyCount)
-	p.temp.nu = make([]*big.Int, partyCount)
 
-	// round 3
+	// round 2
+	p.temp.pointGamma =  make([]*crypto.ECPoint, partyCount)
+	p.temp.beta = Make2DSlice[*big.Int](partyCount)
+	p.temp.betaHat = Make2DSlice[*big.Int](partyCount)
+	p.temp.bigF = Make2DSlice[*big.Int](partyCount)
+	p.temp.bigFHat = Make2DSlice[*big.Int](partyCount)
+	p.temp.bigD = Make2DSlice[*big.Int](partyCount)
+	p.temp.bigDHat = Make2DSlice[*big.Int](partyCount)
+
+/*	// round 3
 	p.temp.alpha = make([]*big.Int, partyCount)
 	p.temp.mu = make([]*big.Int, partyCount)
 	p.temp.D = make([]*big.Int, partyCount)
@@ -200,7 +200,13 @@ func Make2DParsedMessage(dim int) [][]tss.ParsedMessage {
 	return out
 }
 
-func Make2DSlice[K *big.Int | *zkproofs.AffPProof | *zkproofs.AffGProof | *zkproofs.DecProof](dim int) [][]K {
+func Make2DSlice[K *big.Int |
+    *zkproofs.AffPProof |
+    *zkproofs.AffGProof |
+    *zkproofs.AffGInvProof |
+    *zkproofs.LogStarProof|
+    *zkproofs.DecProof ] (dim int) [][]K {
+
 	out := make([][]K, dim)
 	for i, _ := range out {
 		out[i] = make([]K, dim)

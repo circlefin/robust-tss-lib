@@ -206,81 +206,55 @@ func TestMTA_DL(t *testing.T) {
 	assert.Equal(t, 0, left.Cmp(right))
 }
 
-func GenerateAffGData(t *testing.T) (*zkproofs.AffGWitness, *zkproofs.AffGStatement) {
-	N := pkB.N
-	N2 := new(big.Int).Mul(N, N)
+func TestMTA_G(t *testing.T) {
+	setUp(t)
 
-	// Specifically,the Prover has secret input (x, y, rho, rhox, rhoy) such that
-	c := common.GetRandomPositiveInt(q)
-	x := common.GetRandomPositiveInt(q)
-	y := common.GetRandomPositiveInt(q)
-	rho := common.GetRandomPositiveInt(q)
-	rhoy := common.GetRandomPositiveInt(q)
-	witness := &zkproofs.AffGWitness{
-		X:    x,
-		Y:    y,
-		Rho:  rho,
-		Rhoy: rhoy,
-	}
-
-	// X = g^x
-	X := crypto.ScalarBaseMult(ec, witness.X)
-	//  Y = (1+N1)^y * rhoy^N1 mod N1^2
-	Y, _ := pkB.EncryptWithRandomness(y, rhoy)
-	//  D  = C^x * (1+N0)^y * rho^N0 mod N0^2
-	C, _ := pkB.Encrypt(c)
-	Dprime, _ := pkB.EncryptWithRandomness(y, rho)
-	D := zkproofs.ATimesBToTheCModN(Dprime, C, x, N2)
-	statement := &zkproofs.AffGStatement{
-		C:        C,
-		D:        D,
-		X:        X,
-		Y:        Y,
-		N0:       pkB.N,
-		N1:       pkB.N,
-		Ell:      ell,
-		EllPrime: ell,
-	}
-	return witness, statement
-}
-
-func GenerateAffPData(t *testing.T) (*zkproofs.AffPWitness, *zkproofs.AffPStatement) {
-	N02 := new(big.Int).Mul(pkA.N, pkA.N)
-
-	// Specifically,the Prover has secret input (x, y, rho, rhox, rhoy) such that
-	x := common.GetRandomPositiveInt(q)
-	y := common.GetRandomPositiveInt(q)
-	rho := common.GetRandomPositiveInt(q) //common.GetRandomPositiveInt(big.NewInt(1))
-	rhox := common.GetRandomPositiveInt(pkB.N)
-	rhoy := common.GetRandomPositiveInt(pkB.N)
-	witness := &zkproofs.AffPWitness{
-		X:    x,
-		Y:    y,
-		Rho:  rho,
-		Rhox: rhox,
-		Rhoy: rhoy,
-	}
-
-	//  C = PaillierEncrypt(N0, random)
-	C := common.GetRandomPositiveInt(N02)
-	//  D  = C^x * (1+N0)^y * rho^N0 mod N0^2
-	Dprime, err := pkA.EncryptWithRandomness(y, rho)
+	a := common.GetRandomPositiveInt(q)
+	ra := common.GetRandomPositiveInt(pkA.N)
+	Xk, err := pkA.EncryptWithRandomness(a, ra)
 	assert.NoError(t, err)
-	D := zkproofs.ATimesBToTheCModN(Dprime, C, x, N02)
-	//  X = (1+N1)^x * rhox^N1 mod N1^2
-	X, _ := pkB.EncryptWithRandomness(x, rhox)
-	//  Y = (1+N1)^y * rhoy^N1 mod N1^2
-	Y, _ := pkB.EncryptWithRandomness(y, rhoy)
-	statement := &zkproofs.AffPStatement{
-		C:        C,
-		D:        D,
-		X:        X,
-		Y:        Y,
-		N0:       pkA.N,
-		N1:       pkB.N,
-		Ell:      ell,
-		EllPrime: ell,
-		EC:       ec,
+	b := common.GetRandomPositiveInt(q)
+
+	rpVs := []*zkproofs.RingPedersenParams{rpA, rpA, nil, rpB}
+	cA, proofsA, err := accmta.AliceInit(ec, pkA, a, ra, rpVs)
+	assert.NoError(t, err)
+	assert.NotNil(t, proofsA)
+	assert.NotNil(t, cA)
+	assert.Equal(t, 0, Xk.Cmp(cA))
+	statementA := &zkproofs.EncStatement{
+		K:  cA,    // Alice's ciphertext
+		N0: pkA.N, // Alice's public key
+		EC: ec,    // max size of plaintext
 	}
-	return witness, statement
+	for i, rp := range rpVs {
+		if i == 2 {
+			continue
+		}
+		assert.True(t, proofsA[i].Verify(statementA, rp))
+		assert.True(t, accmta.BobVerify(ec, pkA, proofsA[i], cA, rp))
+	}
+
+	B := crypto.ScalarBaseMult(ec, b)
+	assert.NoError(t, err)
+	beta, cAlpha, cBeta, proofs, err := accmta.BobRespondsG(ec, pkA, skB, proofsA[3], b, cA, rpVs, rpB)
+	assert.NoError(t, err)
+	assert.NotNil(t, beta)
+	assert.NotNil(t, cAlpha)
+	assert.NotNil(t, proofs)
+	assert.Equal(t, len(rpVs), len(proofs))
+
+	for i, _ := range rpVs {
+		if rpVs[i] != nil {
+			assert.NotNil(t, proofs[i])
+		}
+		assert.True(t, accmta.AliceVerifyG(ec, &skA.PublicKey, pkB, proofs[i], cA, cAlpha, cBeta, B, rpVs[i]))
+	}
+	alpha, err := accmta.AliceEndG(ec, skA, pkB, proofs[0], cA, cAlpha, cBeta, B, rpA)
+	assert.NotNil(t, alpha)
+	assert.NoError(t, err)
+
+	// expect: alpha + beta = ab
+	right := common.ModInt(q).Add(alpha, beta)
+	left := common.ModInt(q).Mul(a, b)
+	assert.Equal(t, 0, left.Cmp(right))
 }

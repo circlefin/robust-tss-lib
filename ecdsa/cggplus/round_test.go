@@ -35,15 +35,15 @@ func TestRound1(t *testing.T) {
 	AssertNoErrors(t, errChs)
 
 }
-/*
+
 func TestRound2(t *testing.T) {
 	params, parties, outCh, _, _, _ := SetupParties(t)
 	t.Logf("round 1")
 	round1s := RunRound1(t, params, parties, outCh)
 	t.Logf("round 2")
 	totalMessages := len(parties) * (len(parties) - 1)
-	round2s := RunRound[*round1, *round2](t, params, parties, round1s, totalMessages, outCh)
-
+	_ = RunRound[*round1, *round2](t, params, parties, round1s, totalMessages, outCh)
+/*
 	wg := sync.WaitGroup{}
 	partyCount := len(parties)
 	errChs := make(chan *tss.Error, partyCount*partyCount*partyCount)
@@ -57,9 +57,9 @@ func TestRound2(t *testing.T) {
 	}
 	wg.Wait()
 	close(errChs)
-	AssertNoErrors(t, errChs)
+	AssertNoErrors(t, errChs)*/
 }
-
+/*
 func TestRound3(t *testing.T) {
 	params, parties, outCh, _, _, _ := SetupParties(t)
 	t.Logf("round 1")

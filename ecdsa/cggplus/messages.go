@@ -52,7 +52,7 @@ func (m *SignRound1Message) UnmarshalBigG() *big.Int {
 }
 
 func (m *SignRound1Message) UnmarshalBigK() *big.Int {
-	return  new(big.Int).SetBytes(m.GetBigG())
+	return  new(big.Int).SetBytes(m.GetBigK())
 }
 
 func (m *SignRound1Message) UnmarshalPsi() ([]*zkproofs.EncProof, error) {

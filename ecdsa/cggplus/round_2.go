@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"sync"
 
-//	"github.com/bnb-chain/tss-lib/crypto/accmta"
-//	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
+	"github.com/bnb-chain/tss-lib/crypto"
+	"github.com/bnb-chain/tss-lib/crypto/accmta"
+	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
 )
 
@@ -23,36 +24,34 @@ func (round *round2) Start() *tss.Error {
 	i := round.PartyID().Index
 	round.ok[i] = true
 
-//	partyCount := len(round.Parties().IDs())
-/*	proofP := Make2DSlice[*zkproofs.AffPProof](partyCount)
-	proofDL := Make2DSlice[*zkproofs.AffGProof](partyCount)
-	proofBeta := Make2DSlice[*zkproofs.DecProof](partyCount)
-	proofNu := Make2DSlice[*zkproofs.DecProof](partyCount)*/
+	partyCount := len(round.Parties().IDs())
+	psi := Make2DSlice[*zkproofs.AffGInvProof](partyCount)
+	psiHat := Make2DSlice[*zkproofs.AffGInvProof](partyCount)
+	psiPrime := Make2DSlice[*zkproofs.LogStarProof](partyCount)
+
 
 	errChs := make(chan *tss.Error, (len(round.Parties().IDs())-1)*3)
+    round.VerifyRound1Messages(errChs)
+
 	wg := sync.WaitGroup{}
-/*	for j, Pj := range round.Parties().IDs() {
+	for j, Pj := range round.Parties().IDs() {
 		if j == i {
 			continue
 		}
 
 		wg.Add(2)
-		go round.BobRespondsP(j, Pj, proofP, proofBeta, &wg, errChs)
-		go round.BobRespondsDL(j, Pj, proofDL, proofNu, &wg, errChs)
-	}*/
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		round.VerifyRound1Messages(errChs)
-	}()
+		go round.BobRespondsW(j, Pj, psi, &wg, errChs)
+		go round.BobRespondsGamma(j, Pj, psiHat, &wg, errChs)
+		go round.ComputeProofPsiPrime(j, Pj, psiPrime, &wg, errChs)
+	}
 	wg.Wait()
 	close(errChs)
 	err := round.WrapErrorChs(round.PartyID(), errChs, "Failed to verify round 4 messages")
 	if err != nil {
 		return err
 	}
-/*
-	for j, Pj := range round.Parties().IDs() {
+
+/*	for j, Pj := range round.Parties().IDs() {
 		if j == i {
 			continue
 		}
@@ -73,191 +72,133 @@ func (round *round2) Start() *tss.Error {
 }
 
 func (round *round2) VerifyRound1Messages(errChs chan *tss.Error) {
-	wg := sync.WaitGroup{}
 	i := round.PartyID().Index
-	for j, Pj := range round.Parties().IDs() {
+	for j, _ := range round.Parties().IDs() {
 		if i == j {
 			continue
 		}
-		wg.Add(1)
-		go func(j int, Pj *tss.PartyID) {
-			defer wg.Done()
-        	r1msg := round.temp.signRound1Messages[j].Content().(*SignRound1Message)
-	        _, err := r1msg.UnmarshalPsi()
-	        if err != nil {
-                errChs <- round.WrapError(fmt.Errorf("error parsing r1msg[%d]", j))
-	        }
+            r1msg := round.temp.signRound1Messages[j].Content().(*SignRound1Message)
 
 	        bigG := r1msg.UnmarshalBigG()
-	        if err != nil {
-                errChs <- round.WrapError(fmt.Errorf("error parsing r1msg[%d]", j))
-	        }
 	        round.temp.bigG[j] = bigG
 
 	        bigK := r1msg.UnmarshalBigK()
-	        if err != nil {
-                errChs <- round.WrapError(fmt.Errorf("error parsing r1msg[%d]", j))
-	        }
 	        round.temp.bigK[j] = bigK
-		}(j, Pj)
 	}
-	wg.Wait()
-}
-/*
-func (round *round2) VerifyRound1Message(j int, Pj *tss.PartyID, errChs chan *tss.Error) {
-	i := round.PartyID().Index
-
-	r1msg1 := round.temp.signRound1Message1s[j].Content().(*SignRound1Message1)
-	proofXgamma, err := r1msg1.UnmarshalProofXGamma()
-	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("error parsing r1msg1[%d]", j))
-		return
-	}
-	proofXkw, err := r1msg1.UnmarshalProofXKw(round.Params().EC())
-	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("error parsing r1msg1[%d]", j))
-		return
-	}
-	r1msg2 := round.temp.signRound1Message2s[j].Content().(*SignRound1Message2)
-	round.temp.cA[j] = r1msg2.UnmarshalCA()
-	proofXkgamma, err := r1msg2.UnmarshalProofXKgamma()
-	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("error parsing r1msg1[%d]", j))
-		return
-	}
-	round.temp.Xgamma[j] = r1msg2.UnmarshalXGamma()
-	round.temp.Xkgamma[j] = r1msg2.UnmarshalXKGamma()
-	round.temp.Xkw[j] = r1msg2.UnmarshalXKw()
-	rp := round.key.GetRingPedersen(i)
-
-	paillierPK := round.key.PaillierPKs[j]
-	bigW := round.temp.bigWs[j]
-	statementXgamma := &zkproofs.EncStatement{
-		EC: round.Params().EC(),
-		N0: paillierPK.N,
-		K:  round.temp.Xgamma[j],
-	}
-	statementXkgamma := &zkproofs.MulStatement{
-		N: paillierPK.N,
-		X: round.temp.Xgamma[j],
-		Y: round.temp.cA[j],
-		C: round.temp.Xkgamma[j],
-	}
-	statementXkw := &zkproofs.MulStarStatement{
-		Ell: zkproofs.GetEll(round.Params().EC()),
-		N0:  paillierPK.N,
-		C:   round.temp.cA[j],
-		D:   round.temp.Xkw[j],
-		X:   bigW,
-	}
-
-	if !proofXgamma.Verify(statementXgamma, rp) ||
-		!proofXkgamma.Verify(statementXkgamma) ||
-		!proofXkw.Verify(statementXkw, rp) {
-		errChs <- round.WrapError(fmt.Errorf("Failed to verify proofs from [%d]", j))
-		return
-	}
-	return
 }
 
-func (round *round2) BobRespondsP(j int, Pj *tss.PartyID, proofP [][]*zkproofs.AffPProof, proofBeta [][]*zkproofs.DecProof, wg *sync.WaitGroup, errChs chan *tss.Error) {
+func (round *round2) BobRespondsW(j int, Pj *tss.PartyID, proofs [][]*zkproofs.AffGInvProof, wg *sync.WaitGroup, errChs chan *tss.Error) {
 	defer wg.Done()
 	i := round.PartyID().Index
-	if round.temp.signRound1Message1s[j] == nil {
-		errChs <- round.WrapError(fmt.Errorf("nil round1message1[%d]", j))
-		return
-	}
-	r2msg := round.temp.signRound1Message2s[j].Content().(*SignRound1Message2)
-	cA := r2msg.UnmarshalCA()
 
-	r1msg := round.temp.signRound1Message1s[j].Content().(*SignRound1Message1)
-	rangeProofAliceJ, err := r1msg.UnmarshalRangeProofAlice()
+    r1msg := round.temp.signRound1Messages[j].Content().(*SignRound1Message)
+	psiAlice, err := r1msg.UnmarshalPsi()
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("UnmarshalRangeProofAlice failed."), Pj)
-		return
+        errChs <- round.WrapError(fmt.Errorf("error parsing r1msg[%d]", j), Pj)
 	}
 
 	ringPedersenBobI := round.key.GetRingPedersen(i)
 	rpVs := round.key.GetAllRingPedersen()
 	rpVs[i] = nil
-	beta, cAlpha, cBeta, cBetaPrm, proofs, decProofs, err := accmta.BobRespondsP(
+	beta, bigD, bigF, pf, err := accmta.BobRespondsG(
 		round.Params().EC(),
-		// Alice's public key
 		round.key.PaillierPKs[j],
-		// Bob's private key
 		round.key.PaillierSK,
-		// Alice's proof
-		rangeProofAliceJ,
-		// Bob's encrypted secret gamma
-		round.temp.Xgamma[i],
-		// Alice's encryption of a under pkA
-		cA,
-		// Verifier's Ring Pedersen parameters
-		rpVs,
-		// Bob's Ring Pedersen parameters
-		ringPedersenBobI,
-	)
-	if err != nil {
-		errChs <- round.WrapError(err, Pj)
-	}
-
-	// should be thread safe as these are pre-allocated
-	round.temp.beta[j] = beta
-	round.temp.cAlpha[i][j] = cAlpha
-	round.temp.cBeta[i][j] = cBeta
-	round.temp.cBetaPrm[i][j] = cBetaPrm
-	proofP[j] = proofs
-	proofBeta[j] = decProofs
-}
-
-// BobRespondsDL on share k*w, Bob's secret is w
-func (round *round2) BobRespondsDL(j int, Pj *tss.PartyID, proofDL [][]*zkproofs.AffGProof, proofNu [][]*zkproofs.DecProof, wg *sync.WaitGroup, errChs chan *tss.Error) {
-	defer wg.Done()
-	i := round.PartyID().Index
-	r2msg := round.temp.signRound1Message2s[j].Content().(*SignRound1Message2)
-	cA := r2msg.UnmarshalCA()
-
-	r1msg := round.temp.signRound1Message1s[j].Content().(*SignRound1Message1)
-	rangeProofAliceJ, err := r1msg.UnmarshalRangeProofAlice()
-	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("UnmarshalRangeProofAlice failed"), Pj)
-		return
-	}
-
-	ringPedersenBobI := round.key.GetRingPedersen(i)
-	rpVs := round.key.GetAllRingPedersen()
-	rpVs[i] = nil
-	nu, cMu, cNu, cNuPrm, proofs, decProofs, err := accmta.BobRespondsDL(
-		round.Params().EC(),
-		// Alice's public key
-		round.key.PaillierPKs[j],
-		// Bob's public key
-		round.key.PaillierSK,
-		// Alice's proof
-		rangeProofAliceJ,
-		// Bob's secret
+		psiAlice[i],
 		round.temp.w,
-		// Alice's encryption of a under pkA
-		cA,
-		// Verifier's Ring Pedersen parameters
+		round.temp.bigK[j],
 		rpVs,
-		// Bob's Ring Pedersen parameters
 		ringPedersenBobI,
-		// DL commitment to Bob's input b
-		round.temp.bigWs[i],
 	)
 	if err != nil {
-		errChs <- round.WrapError(err, Pj)
+		errChs <- round.WrapError(fmt.Errorf("bobrespondsw"))
 	}
 
-	round.temp.nu[j] = nu
-	round.temp.cMu[i][j] = cMu
-	round.temp.cNu[i][j] = cNu
-	round.temp.cNuPrm[i][j] = cNuPrm
-	proofDL[j] = proofs
-	proofNu[j] = decProofs
+	round.temp.beta[i][j] = beta
+	round.temp.bigD[i][j] = bigD
+	round.temp.bigF[i][j] = bigF
+	proofs[j] = pf
 }
-*/
+
+func (round *round2) BobRespondsGamma(j int, Pj *tss.PartyID, proofs [][]*zkproofs.AffGInvProof, wg *sync.WaitGroup, errChs chan *tss.Error) {
+	defer wg.Done()
+	i := round.PartyID().Index
+
+    r1msg := round.temp.signRound1Messages[j].Content().(*SignRound1Message)
+	psiAlice, err := r1msg.UnmarshalPsi()
+	if err != nil {
+        errChs <- round.WrapError(fmt.Errorf("error parsing r1msg[%d]", j), Pj)
+	}
+
+	ringPedersenBobI := round.key.GetRingPedersen(i)
+	rpVs := round.key.GetAllRingPedersen()
+	rpVs[i] = nil
+	betaHat, bigDHat, bigFHat, pf, err := accmta.BobRespondsG(
+		round.Params().EC(),
+		round.key.PaillierPKs[j],
+		round.key.PaillierSK,
+		psiAlice[i],
+		round.temp.gamma,
+		round.temp.bigK[j],
+		rpVs,
+		ringPedersenBobI,
+	)
+	if err != nil {
+		errChs <- round.WrapError(fmt.Errorf("bobrespondsGamma"))
+
+	}
+
+	round.temp.betaHat[i][j] = betaHat
+	round.temp.bigDHat[i][j] = bigDHat
+	round.temp.bigFHat[i][j] = bigFHat
+	proofs[j] = pf
+}
+
+func (round *round2) ComputeProofPsiPrime(j int,  Pj *tss.PartyID, proofs [][]*zkproofs.LogStarProof, wg *sync.WaitGroup, errChs chan *tss.Error) {
+  	i := round.PartyID().Index
+
+    ec := round.Params().EC()
+    round.temp.pointGamma[i] = crypto.ScalarBaseMult(ec, round.temp.gamma)
+	rpVs := round.key.GetAllRingPedersen()
+	rpVs[i] = nil
+
+    _, rho, err := round.key.PaillierSK.DecryptFull(round.temp.bigG[i])
+    if err != nil {
+        errChs <- round.WrapError(fmt.Errorf("error making parsing bigG[%d]", i), Pj)
+    }
+	witness := &zkproofs.LogStarWitness{
+		X:   round.temp.gamma,
+		Rho: rho,
+	}
+	statement := &zkproofs.LogStarStatement{
+		Ell: zkproofs.GetEll(ec),
+		N0:  round.key.PaillierSK.PublicKey.N,
+		C:   round.temp.bigG[i],
+		X:   round.temp.pointGamma[i],
+	}
+
+  	for verifier, rp := range rpVs {
+  		if rp == nil {
+  			continue
+  		}
+  		wg.Add(1)
+  		go func(j, verifier int, rp *zkproofs.RingPedersenParams) {
+            defer wg.Done()
+                if rp == nil {
+                    errChs <- round.WrapError(fmt.Errorf("rp nil[%d][%d][%d]", i, j, verifier), Pj)
+                }
+                if rp.N == nil {
+                    errChs <- round.WrapError(fmt.Errorf("rp.N nil[%d][%d][%d]", i, j, verifier), Pj)
+                }
+                if statement.Ell == nil {
+                    errChs <- round.WrapError(fmt.Errorf("Ell nil[%d][%d][%d]", i, j, verifier), Pj)
+                }
+
+            proofs[j][verifier] = zkproofs.NewLogStarProof(witness, statement, rp)
+  		}(j, verifier, rp)
+  	}
+}
+
 func (round *round2) Update() (bool, *tss.Error) {
 	for i, msgArray := range round.temp.signRound2Messages {
 		for j, msg := range msgArray {
