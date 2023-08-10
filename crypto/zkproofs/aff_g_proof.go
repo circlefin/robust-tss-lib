@@ -98,10 +98,7 @@ func NewAffGProof(wit *AffGWitness, stmt *AffGStatement, rp *RingPedersenParams)
 	// A = C^alpha * (1+N0)^beta * r^N0 mod N0^2
 	pkN0 := &paillier.PublicKey{N: stmt.N0}
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
-	Aprime, err := pkN0.EncryptWithRandomness(beta, r)
-	if err != nil {
-		return nil, err
-	}
+	Aprime := pkN0.EncryptWithRandomnessNoErrChk(beta, r)
 	A := ATimesBToTheCModN(Aprime, stmt.C, alpha, N02)
 
 	// Bx=g^alpha
@@ -109,10 +106,7 @@ func NewAffGProof(wit *AffGWitness, stmt *AffGStatement, rp *RingPedersenParams)
 
 	// By = (1+N1)^beta * ry^N1 mod N1^2
 	pkN1 := &paillier.PublicKey{N: stmt.N1}
-	By, err := pkN1.EncryptWithRandomness(beta, ry)
-	if err != nil {
-		return nil, err
-	}
+	By := pkN1.EncryptWithRandomnessNoErrChk(beta, ry)
 
 	// E = s^alpha t^gamma mod Nhat
 	E := rp.Commit(alpha, gamma)
@@ -176,12 +170,12 @@ func (proof *AffGProof) Verify(stmt *AffGStatement, rp *RingPedersenParams) bool
 	e := proof.GetChallenge(stmt, rp)
 
 	// check C^z1 (1+n0)^z2 w^N0 == A * D^e mod No^2A
-	pkN0 := &paillier.PublicKey{N: stmt.N0}
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
-	encZ2, err := pkN0.EncryptWithRandomness(proof.Z2, proof.W)
+	pkN0 := &paillier.PublicKey{N: stmt.N0}
+	encZ2 := pkN0.EncryptWithRandomnessNoErrChk(proof.Z2, proof.W)
 	left1 := ATimesBToTheCModN(encZ2, stmt.C, proof.Z1, N02)
 	right1 := ATimesBToTheCModN(proof.A, stmt.D, e, N02)
-	if err != nil || left1.Cmp(right1) != 0 {
+	if left1.Cmp(right1) != 0 {
 		return false
 	}
 
@@ -193,11 +187,11 @@ func (proof *AffGProof) Verify(stmt *AffGStatement, rp *RingPedersenParams) bool
 	}
 
 	// check if (1+N1)^z2 * wy^N1 == By * Y^e mod N1^2
-	pkN1 := &paillier.PublicKey{N: stmt.N1}
 	N12 := new(big.Int).Mul(stmt.N1, stmt.N1)
-	left3, err := pkN1.EncryptWithRandomness(proof.Z2, proof.Wy)
+	pkN1 := &paillier.PublicKey{N: stmt.N1}
+	left3 := pkN1.EncryptWithRandomnessNoErrChk(proof.Z2, proof.Wy)
 	right3 := ATimesBToTheCModN(proof.By, stmt.Y, e, N12)
-	if err != nil || left3.Cmp(right3) != 0 {
+	if left3.Cmp(right3) != 0 {
 		return false
 	}
 
@@ -272,6 +266,24 @@ func (proof *AffGProof) Bytes() [][]byte {
 		proof.W.Bytes(),
 		proof.Wy.Bytes(),
 	}
+}
+
+func (proof *AffGProof) NotNil() bool {
+	if proof.IsNil() {
+		return false
+	}
+	return proof.A != nil &&
+		proof.Bx != nil &&
+		proof.E != nil &&
+		proof.S != nil &&
+		proof.F != nil &&
+		proof.T != nil &&
+		proof.Z1 != nil &&
+		proof.Z2 != nil &&
+		proof.Z3 != nil &&
+		proof.Z4 != nil &&
+		proof.W != nil &&
+		proof.Wy != nil
 }
 
 func (proof *AffGProof) ProofFromBytes(ec elliptic.Curve, bzs [][]byte) (Proof, error) {

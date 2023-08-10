@@ -49,6 +49,31 @@ func GenerateAffGData(t *testing.T) (*zkproofs.AffGWitness, *zkproofs.AffGStatem
 	return witness, statement
 }
 
+func TestAffGInvProof(t *testing.T) {
+	setUp(t)
+	x := common.GetRandomPositiveInt(q)
+	y := common.GetRandomPositiveInt(q)
+	c := common.GetRandomPositiveInt(q)
+	C, _ := publicKey.Encrypt(c)
+
+	witness, statement, err := zkproofs.NewAffGInvWitness(ec, privateKey, publicKey, x, y, C)
+	assert.NoError(t, err)
+	proof, err := zkproofs.NewAffGInvProof(witness, statement, ringPedersen)
+	assert.NoError(t, err, "could not create NewAffGInvProof")
+	assert.NotNil(t, proof, "NewAffGInvProof nil")
+	assert.False(t, proof.IsNil(), "proof has nil fields")
+	assert.True(t, proof.Verify(statement, ringPedersen), "proof does not verify")
+
+	proofBytes := proof.Bytes()
+	var proofInBytes [][]byte = proofBytes[:]
+	np, err := new(zkproofs.AffGInvProof).ProofFromBytes(ec, proofInBytes)
+	newProof := np.(*zkproofs.AffGInvProof)
+	assert.NoError(t, err, "could not create NewAffGProof")
+	assert.NotNil(t, newProof, "NewAffGProof nil")
+	assert.False(t, newProof.IsNil(), "proof has nil fields")
+	assert.True(t, newProof.Verify(statement, ringPedersen), "proof does not verify")
+}
+
 func TestAffGProof(t *testing.T) {
 	setUp(t)
 	witness, statement := GenerateAffGData(t)

@@ -139,13 +139,19 @@ func TestMultInv(t *testing.T) {
 	setUp(t)
 	num := big.NewInt(2343)
 	zero := big.NewInt(0)
+	q := tss.EC().Params().N
 
 	cipher, _ := publicKey.Encrypt(num)
 	inv, _ := publicKey.HomoMultInv(cipher)
 	negNum, _ := privateKey.Decrypt(inv)
+	NMinusNum := new(big.Int).Sub(publicKey.N, num)
 	actual := common.ModInt(publicKey.N).Add(num, negNum)
+
 	assert.True(t, common.ModInt(publicKey.N).IsCongruent(zero, actual))
 	assert.True(t, common.ModInt(publicKey.N).IsAdditiveInverse(num, negNum))
+    assert.Equal(t, 0, negNum.Cmp(NMinusNum))
+	assert.True(t, common.ModInt(q).IsCongruent(zero, actual))
+	assert.False(t, common.ModInt(q).IsAdditiveInverse(num, negNum))
 }
 
 func TestHomoAdd(t *testing.T) {
