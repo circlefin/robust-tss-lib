@@ -39,11 +39,12 @@ type (
 
 	localMessageStore struct {
 		signRound1Messages,
+		signRound2Message2s,
 		signRound3Messages,
 		signRound4Messages,
 		signRound5Messages,
 		signRound6Messages []tss.ParsedMessage
-		signRound2Messages [][]tss.ParsedMessage
+		signRound2Message1s [][]tss.ParsedMessage
 	}
 
 	localTempData struct {
@@ -154,7 +155,8 @@ func NewLocalPartyWithKDD(
 	}
 	// msgs init
 	p.temp.signRound1Messages = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound2Messages = Make2DParsedMessage(partyCount)
+	p.temp.signRound2Message1s = Make2DParsedMessage(partyCount)
+	p.temp.signRound2Message2s = make([]tss.ParsedMessage, partyCount)
 /*	p.temp.signRound3Messages = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound4Messages = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound5Messages = make([]tss.ParsedMessage, partyCount)
@@ -267,11 +269,13 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 	switch msg.Content().(type) {
 	case *SignRound1Message:
 		p.temp.signRound1Messages[fromPIdx] = msg
-/*	case *SignRound2Message:
-		r2msg := msg.Content().(*SignRound2Message)
+	case *SignRound2Message1:
+		r2msg := msg.Content().(*SignRound2Message1)
 		toPIdx := r2msg.UnmarshalRecipient()
-		p.temp.signRound2Messages[fromPIdx][toPIdx] = msg
-	case *SignRound3Message:
+		p.temp.signRound2Message1s[fromPIdx][toPIdx] = msg
+	case *SignRound2Message2:
+		p.temp.signRound2Message2s[fromPIdx] = msg
+/*	case *SignRound3Message:
 		p.temp.signRound3Messages[fromPIdx] = msg
 	case *SignRound4Message:
 		p.temp.signRound4Messages[fromPIdx] = msg

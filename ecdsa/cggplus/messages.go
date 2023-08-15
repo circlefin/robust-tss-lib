@@ -1,12 +1,12 @@
 package cggplus
 
 import (
-//	"crypto/elliptic"
+	"crypto/elliptic"
 	"math/big"
-//	"strconv"
+	"strconv"
 
 	"github.com/bnb-chain/tss-lib/common"
-//	"github.com/bnb-chain/tss-lib/crypto"
+	"github.com/bnb-chain/tss-lib/crypto"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -15,9 +15,9 @@ var (
 	// Ensure that signing messages implement ValidateBasic
 	_ = []tss.MessageContent{
 		(*SignRound1Message)(nil),
-/*		(*SignRound1Message2)(nil),
-		(*SignRound2Message)(nil),
-		(*SignRound3Message)(nil),
+		(*SignRound2Message1)(nil),
+		(*SignRound2Message2)(nil),
+/*		(*SignRound3Message)(nil),
 		(*SignRound4Message)(nil),*/
 	}
 )
@@ -58,6 +58,116 @@ func (m *SignRound1Message) UnmarshalBigK() *big.Int {
 func (m *SignRound1Message) UnmarshalPsi() ([]*zkproofs.EncProof, error) {
     return zkproofs.ProofArrayFromBytes[*zkproofs.EncProof](nil, m.GetPsi())
 }
+
+
+func NewSignRound2Message1 (
+	recipient, from *tss.PartyID,
+	bigD, bigDHat, bigF, bigFHat *big.Int,
+	psiArray, psiHatArray []*zkproofs.AffGInvProof,
+) tss.ParsedMessage {
+	meta := tss.MessageRouting{
+		From:        from,
+		IsBroadcast: true,
+	}
+	pPsi := zkproofs.ProofArrayToBytes(psiArray)
+	pPsiHat := zkproofs.ProofArrayToBytes(psiHatArray)
+	content := &SignRound2Message1{
+		Recipient: []byte(strconv.Itoa(recipient.Index)),
+		BigD: bigD.Bytes(),
+		BigDHat: bigDHat.Bytes(),
+		BigF: bigF.Bytes(),
+		BigFHat: bigFHat.Bytes(),
+		Psi: pPsi[:],
+		PsiHat:  pPsiHat[:],
+	}
+	msg := tss.NewMessageWrapper(meta, content)
+	return tss.NewMessage(meta, content, msg)
+}
+
+func (m * SignRound2Message1) ValidateBasic() bool {
+	return m != nil &&
+		common.NonEmptyBytes(m.GetRecipient()) &&
+		common.NonEmptyBytes(m.GetBigD()) &&
+		common.NonEmptyBytes(m.GetBigDHat()) &&
+		common.NonEmptyBytes(m.GetBigF()) &&
+		common.NonEmptyBytes(m.GetBigFHat())
+}
+
+func (m *SignRound2Message1) UnmarshalRecipient() int {
+	x, err := strconv.Atoi(string(m.GetRecipient()))
+	if err != nil {
+		return -1
+	}
+	return x
+}
+
+func (m *SignRound2Message1) UnmarshalBigD() *big.Int {
+	return new(big.Int).SetBytes(m.GetBigD())
+}
+
+func (m *SignRound2Message1) UnmarshalBigDHat() *big.Int {
+	return new(big.Int).SetBytes(m.GetBigDHat())
+}
+
+func (m *SignRound2Message1) UnmarshalBigF() *big.Int {
+	return new(big.Int).SetBytes(m.GetBigF())
+}
+
+func (m *SignRound2Message1) UnmarshalBigFHat() *big.Int {
+	return new(big.Int).SetBytes(m.GetBigFHat())
+}
+
+func (m *SignRound2Message1) UnmarshalPsi(ec elliptic.Curve) ([]*zkproofs.AffGInvProof, error) {
+	return zkproofs.ProofArrayFromBytes[*zkproofs.AffGInvProof](ec, m.GetPsi())
+}
+
+func (m *SignRound2Message1) UnmarshalPsiHat(ec elliptic.Curve) ([]*zkproofs.AffGInvProof, error) {
+	return zkproofs.ProofArrayFromBytes[*zkproofs.AffGInvProof](ec, m.GetPsiHat())
+}
+
+func NewSignRound2Message2 (
+	from *tss.PartyID,
+	pointGamma *crypto.ECPoint,
+	psiPrimeArray []*zkproofs.LogStarProof,
+) tss.ParsedMessage {
+	meta := tss.MessageRouting{
+		From:        from,
+		IsBroadcast: true,
+	}
+	pGamma := [][]byte{pointGamma.X().Bytes(), pointGamma.Y().Bytes()}
+	pPsiPrime := zkproofs.ProofArrayToBytes(psiPrimeArray)
+	content := &SignRound2Message2{
+		PointGamma: pGamma[:],
+		PsiPrime: pPsiPrime[:],
+	}
+	msg := tss.NewMessageWrapper(meta, content)
+	return tss.NewMessage(meta, content, msg)
+}
+
+func (m * SignRound2Message2) ValidateBasic() bool {
+	return m != nil &&
+	    m.GetPointGamma() != nil &&
+		common.NonEmptyBytes(m.GetPointGamma()[0]) &&
+		common.NonEmptyBytes(m.GetPointGamma()[1])
+}
+
+func (m *SignRound2Message2) UnmarshalGamma(ec elliptic.Curve) (*crypto.ECPoint, error) {
+	bzs := m.GetPointGamma()
+	Gamma, err := crypto.NewECPoint(
+		ec,
+		new(big.Int).SetBytes(bzs[0]),
+		new(big.Int).SetBytes(bzs[1]),
+	)
+	if err != nil {
+		return Gamma, err
+	}
+	return Gamma, nil
+}
+
+func (m *SignRound2Message2) UnmarshalPsiPrime(ec elliptic.Curve) ([]*zkproofs.LogStarProof, error) {
+	return zkproofs.ProofArrayFromBytes[*zkproofs.LogStarProof](ec, m.GetPsiPrime())
+}
+
 
 /*
 func NewSignRound1Message2(
