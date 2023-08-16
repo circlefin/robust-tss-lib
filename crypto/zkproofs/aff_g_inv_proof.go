@@ -51,17 +51,17 @@ type AffGInvStatement struct {
 // Input Y = (N+1)^y * rho^N mod N2
 // Output Y = Y^(-1) * (N+1)^(q-N) mod N^2
 func MakeY(Y, q, N *big.Int) (*big.Int, error) {
-    pk := &paillier.PublicKey{N: N}
-    Yp, err := pk.HomoMultInv(Y)
-    if err != nil {
-        return nil, err
-    }
+	pk := &paillier.PublicKey{N: N}
+	Yp, err := pk.HomoMultInv(Y)
+	if err != nil {
+		return nil, err
+	}
 
-    qMinusN := new(big.Int).Sub(q, N)
-    qMinusNCipher := pk.EncryptWithRandomnessNoErrChk(qMinusN, big.NewInt(1))
-    NSquare := new(big.Int).Mul(N, N)
-    Yp = common.ModInt(NSquare).Mul(Yp, qMinusNCipher)
-    return Yp, err
+	qMinusN := new(big.Int).Sub(q, N)
+	qMinusNCipher := pk.EncryptWithRandomnessNoErrChk(qMinusN, big.NewInt(1))
+	NSquare := new(big.Int).Mul(N, N)
+	Yp = common.ModInt(NSquare).Mul(Yp, qMinusNCipher)
+	return Yp, err
 }
 
 // ec : elliptic.Curve
@@ -123,29 +123,29 @@ func NewAffGInvWitness(
 }
 
 func (stmt *AffGInvStatement) ToAffGStatement() (*AffGStatement, error) {
-    q := stmt.X.Curve().Params().N
-    Yp, err := MakeY(stmt.Y, q, stmt.N1 )
-    if err != nil {
-        return nil, err
-    }
+	q := stmt.X.Curve().Params().N
+	Yp, err := MakeY(stmt.Y, q, stmt.N1)
+	if err != nil {
+		return nil, err
+	}
 
 	gstmt := &AffGStatement{
-			C:        stmt.C,
-			D:        stmt.D,
-			X:        stmt.X,
-			Y:        Yp,
-			N0:       stmt.N0,
-			N1:       stmt.N1,
-			Ell:      stmt.Ell,
-			EllPrime: stmt.EllPrime,
-		}
+		C:        stmt.C,
+		D:        stmt.D,
+		X:        stmt.X,
+		Y:        Yp,
+		N0:       stmt.N0,
+		N1:       stmt.N1,
+		Ell:      stmt.Ell,
+		EllPrime: stmt.EllPrime,
+	}
 	return gstmt, nil
 }
 
 func (wit *AffGInvWitness) ToAffGWitness(stmt *AffGInvStatement) *AffGWitness {
-    q := stmt.X.Curve().Params().N
-    qMinusY := new(big.Int).Sub(q, wit.Y)
-    return &AffGWitness{
+	q := stmt.X.Curve().Params().N
+	qMinusY := new(big.Int).Sub(q, wit.Y)
+	return &AffGWitness{
 		X:    wit.X,
 		Y:    qMinusY,
 		Rho:  wit.Rho,
@@ -176,10 +176,10 @@ func (proof *AffGInvProof) Verify(stmt *AffGInvStatement, rp *RingPedersenParams
 	gproof := &proof.AffGProof
 	gstmt, err := stmt.ToAffGStatement()
 	if err != nil {
-	    return false
+		return false
 	}
 
-    return gproof.Verify(gstmt, rp)
+	return gproof.Verify(gstmt, rp)
 }
 
 func (proof *AffGProof) ToAffGInvProof() *AffGInvProof {
@@ -198,8 +198,8 @@ func (proof *AffGInvProof) Parts() int {
 }
 
 func (proof *AffGInvProof) Bytes() [][]byte {
-    gproof := &proof.AffGProof
-    return gproof.Bytes()
+	gproof := &proof.AffGProof
+	return gproof.Bytes()
 }
 
 func (proof *AffGInvProof) NotNil() bool {
@@ -212,9 +212,9 @@ func (proof *AffGInvProof) NotNil() bool {
 
 func (proof *AffGInvProof) ProofFromBytes(ec elliptic.Curve, bzs [][]byte) (Proof, error) {
 	np, err := new(AffGProof).ProofFromBytes(ec, bzs)
-    if err != nil {
-        return nil, fmt.Errorf("could not read AffGInvProof")
-    }
+	if err != nil {
+		return nil, fmt.Errorf("could not read AffGInvProof")
+	}
 	newProof := np.(*AffGProof)
-    return newProof.ToAffGInvProof(), nil
+	return newProof.ToAffGInvProof(), nil
 }

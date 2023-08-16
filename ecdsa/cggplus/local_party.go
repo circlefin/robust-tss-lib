@@ -49,7 +49,7 @@ type (
 
 	localTempData struct {
 		localMessageStore
-        m,
+		m,
 		// round 1 - all data except bigWs removed in round 5
 		keyDerivationDelta,
 		w,
@@ -61,36 +61,35 @@ type (
 		bigK []*big.Int // [sender] -> self
 		bigWs []*crypto.ECPoint // [sender] -> self
 
-
 		// round 2
-        pointGamma []*crypto.ECPoint // [sender] -> self
-        beta,
-        betaHat,
-        bigF,
-        bigFHat,
-        bigD,
-        bigDHat [][]*big.Int // [sender][receiver]
-//        psi,
-//        psihat [][][]*zkproofs.AffGProof // [sender][receiver][verifier]
-//        psiprime [][][]*zkproofs.LogStarProof // [sender][receiver][verifier]
-/*
+		pointGamma []*crypto.ECPoint // [sender] -> self
+		beta,
+		betaHat,
+		bigF,
+		bigFHat,
+		bigD,
+		bigDHat [][]*big.Int // [sender][receiver]
+
 		// round 3
 		delta,
-		D,
+		chi,
 		alpha,
-		mu []*big.Int // [sender] -> self
+		alphaHat []*big.Int // [sender] -> self
+		Gamma    *crypto.ECPoint
+		bigDelta []*crypto.ECPoint
 
-		// round 4
-		finalDeltaInv *big.Int
+		/*
+			// round 4
+			finalDeltaInv *big.Int
 
-		// round 5
-		bigS []*big.Int
-		m,
-		sigma,
-		si,
-		rx,
-		ry *big.Int
-		bigR *crypto.ECPoint */
+			// round 5
+			bigS []*big.Int
+			m,
+			sigma,
+			si,
+			rx,
+			ry *big.Int
+			bigR *crypto.ECPoint */
 	}
 )
 
@@ -104,25 +103,25 @@ func (temp *localTempData) CleanUpPreSigningData() {
 	temp.bigG = nil
 	temp.bigK = nil
 	//		leave bigWs
-/*
-	// round 2
-	temp.beta = nil
-	temp.nu = nil
-	temp.cAlpha = nil
-	temp.cBeta = nil
-	temp.cBetaPrm = nil
-	temp.cMu = nil
-	temp.cNu = nil
-	temp.cNuPrm = nil
+	/*
+		// round 2
+		temp.beta = nil
+		temp.nu = nil
+		temp.cAlpha = nil
+		temp.cBeta = nil
+		temp.cBetaPrm = nil
+		temp.cMu = nil
+		temp.cNu = nil
+		temp.cNuPrm = nil
 
-	// round 3
-	temp.delta = nil
-	temp.D = nil
-	temp.alpha = nil
-	temp.mu = nil
+		// round 3
+		temp.delta = nil
+		temp.D = nil
+		temp.alpha = nil
+		temp.mu = nil
 
-	// round 4
-	temp.finalDeltaInv = nil*/
+		// round 4
+		temp.finalDeltaInv = nil*/
 }
 
 func NewLocalParty(
@@ -157,13 +156,13 @@ func NewLocalPartyWithKDD(
 	p.temp.signRound1Messages = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound2Message1s = Make2DParsedMessage(partyCount)
 	p.temp.signRound2Message2s = make([]tss.ParsedMessage, partyCount)
-/*	p.temp.signRound3Messages = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound4Messages = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound5Messages = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound6Messages = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound7Messages = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound8Messages = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound9Messages = make([]tss.ParsedMessage, partyCount)*/
+	p.temp.signRound3Messages = make([]tss.ParsedMessage, partyCount)
+	/*	p.temp.signRound4Messages = make([]tss.ParsedMessage, partyCount)
+		p.temp.signRound5Messages = make([]tss.ParsedMessage, partyCount)
+		p.temp.signRound6Messages = make([]tss.ParsedMessage, partyCount)
+		p.temp.signRound7Messages = make([]tss.ParsedMessage, partyCount)
+		p.temp.signRound8Messages = make([]tss.ParsedMessage, partyCount)
+		p.temp.signRound9Messages = make([]tss.ParsedMessage, partyCount)*/
 
 	// temp data init
 	p.temp.keyDerivationDelta = keyDerivationDelta
@@ -175,7 +174,7 @@ func NewLocalPartyWithKDD(
 	p.temp.bigWs = make([]*crypto.ECPoint, partyCount)
 
 	// round 2
-	p.temp.pointGamma =  make([]*crypto.ECPoint, partyCount)
+	p.temp.pointGamma = make([]*crypto.ECPoint, partyCount)
 	p.temp.beta = Make2DSlice[*big.Int](partyCount)
 	p.temp.betaHat = Make2DSlice[*big.Int](partyCount)
 	p.temp.bigF = Make2DSlice[*big.Int](partyCount)
@@ -183,14 +182,15 @@ func NewLocalPartyWithKDD(
 	p.temp.bigD = Make2DSlice[*big.Int](partyCount)
 	p.temp.bigDHat = Make2DSlice[*big.Int](partyCount)
 
-/*	// round 3
+	// round 3
 	p.temp.alpha = make([]*big.Int, partyCount)
-	p.temp.mu = make([]*big.Int, partyCount)
-	p.temp.D = make([]*big.Int, partyCount)
+	p.temp.alphaHat = make([]*big.Int, partyCount)
 	p.temp.delta = make([]*big.Int, partyCount)
-
-	p.temp.bigS = make([]*big.Int, partyCount)
-*/
+	p.temp.chi = make([]*big.Int, partyCount)
+	p.temp.bigDelta = make([]*crypto.ECPoint, partyCount)
+	/*
+		p.temp.bigS = make([]*big.Int, partyCount)
+	*/
 	return p
 }
 
@@ -203,11 +203,11 @@ func Make2DParsedMessage(dim int) [][]tss.ParsedMessage {
 }
 
 func Make2DSlice[K *big.Int |
-    *zkproofs.AffPProof |
-    *zkproofs.AffGProof |
-    *zkproofs.AffGInvProof |
-    *zkproofs.LogStarProof|
-    *zkproofs.DecProof ] (dim int) [][]K {
+	*zkproofs.AffPProof |
+	*zkproofs.AffGProof |
+	*zkproofs.AffGInvProof |
+	*zkproofs.LogStarProof |
+	*zkproofs.DecProof](dim int) [][]K {
 
 	out := make([][]K, dim)
 	for i, _ := range out {
@@ -275,12 +275,12 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 		p.temp.signRound2Message1s[fromPIdx][toPIdx] = msg
 	case *SignRound2Message2:
 		p.temp.signRound2Message2s[fromPIdx] = msg
-/*	case *SignRound3Message:
+	case *SignRound3Message:
 		p.temp.signRound3Messages[fromPIdx] = msg
-	case *SignRound4Message:
-		p.temp.signRound4Messages[fromPIdx] = msg
-	case *SignRound5Message:
-		p.temp.signRound5Messages[fromPIdx] = msg */
+	/*		case *SignRound4Message:
+				p.temp.signRound4Messages[fromPIdx] = msg
+			case *SignRound5Message:
+				p.temp.signRound5Messages[fromPIdx] = msg */
 	default: // unrecognised message, just ignore!
 		common.Logger.Warningf("unrecognised message ignored: %v", msg)
 		return false, nil

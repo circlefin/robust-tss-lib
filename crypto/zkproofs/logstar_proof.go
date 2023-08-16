@@ -52,13 +52,18 @@ type LogStarStatement struct {
 	N0  *big.Int
 	C   *big.Int
 	X   *crypto.ECPoint
+	G   *crypto.ECPoint
 }
 
 // log* in CGG21 in CGG21 Appendix C.2 Figure 25
 // todo: check proof for typos - especially modular reduction for some values.
 func NewLogStarProof(wit *LogStarWitness, stmt *LogStarStatement, rp *RingPedersenParams) *LogStarProof {
+	if stmt.G == nil {
+		ec := stmt.X.Curve()
+		stmt.G = crypto.NewECPointNoCurveCheck(ec, ec.Params().Gx, ec.Params().Gy)
+	}
+
 	// derive some parameters
-	ec := stmt.X.Curve()
 	ecpc := NewEll(stmt.Ell)
 
 	// 1. Prover samples alpha, mu, r, gamma
@@ -80,7 +85,7 @@ func NewLogStarProof(wit *LogStarWitness, stmt *LogStarStatement, rp *RingPeders
 	A, _ := pkN0.EncryptWithRandomness(alpha, r)
 
 	// Y=g^alpha
-	Y := crypto.ScalarBaseMult(ec, alpha)
+	Y := stmt.G.ScalarMult(alpha)
 
 	// D=s^alpha *t^gamma mod Nhat
 	D := rp.Commit(alpha, gamma)
@@ -119,8 +124,10 @@ func (proof *LogStarProof) Verify(stmt *LogStarStatement, rp *RingPedersenParams
 		return false
 	}
 
-	// derive some parameters
-	ec := stmt.X.Curve()
+	if stmt.G == nil {
+		ec := stmt.X.Curve()
+		stmt.G = crypto.NewECPointNoCurveCheck(ec, ec.Params().Gx, ec.Params().Gy)
+	}
 
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
@@ -135,7 +142,7 @@ func (proof *LogStarProof) Verify(stmt *LogStarStatement, rp *RingPedersenParams
 	}
 
 	// check g^z1 = Y * X^e \in G
-	left2 := crypto.ScalarBaseMult(ec, proof.Z1)
+	left2 := stmt.G.ScalarMult(proof.Z1)
 	right2, err := proof.Y.Add(stmt.X.ScalarMult(e))
 	if err != nil || !left2.Equals(right2) {
 		return false
@@ -160,7 +167,7 @@ func (proof *LogStarProof) GetChallenge(stmt *LogStarStatement, rp *RingPedersen
 	params := stmt.X.Curve().Params()
 	msg := []*big.Int{
 		stmt.Ell, params.Gx, params.Gy, params.N, big.NewInt(int64(params.BitSize)),
-		stmt.N0, stmt.X.X(), stmt.X.Y(), stmt.C,
+		stmt.N0, stmt.X.X(), stmt.X.Y(), stmt.C, stmt.G.X(), stmt.G.Y(),
 		rp.N, rp.S, rp.T,
 		proof.S, proof.A, proof.Y.X(), proof.Y.Y(), proof.D}
 	e := common.SHA512_256i(msg...)

@@ -35,3 +35,12 @@ message SignRound2Message2 {
     repeated bytes point_gamma = 1;
     repeated bytes psi_prime = 2;
 }
+
+/*
+ * Represents a broadcast message during Round 3 of the accountable cgg+ ECDSA TSS signing protocol.
+ */
+message SignRound3Message {
+    bytes delta = 1;
+    repeated bytes bigDelta = 2;
+    repeated bytes psi_prime_prime = 3;
+}

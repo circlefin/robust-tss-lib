@@ -42,6 +42,42 @@ func TestLogStarProof(t *testing.T) {
 	assert.True(t, proof.Verify(statement, ringPedersen), "proof failed to verify")
 }
 
+func TestLogStarGProof(t *testing.T) {
+	setUp(t)
+
+	// witness
+	witness := &zkproofs.LogStarWitness{
+		X:   common.GetRandomPositiveInt(q),
+		Rho: common.GetRandomPositiveInt(publicKey.N),
+	}
+
+	// G = g^x
+	G := crypto.ScalarBaseMult(ec, witness.X)
+
+	// X = G^x
+	X := G.ScalarMult(witness.X)
+
+	// C = Encrypt(N0, x, rho)
+	C, err := publicKey.EncryptWithRandomness(witness.X, witness.Rho)
+	assert.NoError(t, err, "encrypt C not error")
+
+	statement := &zkproofs.LogStarStatement{
+		Ell: ell,
+		N0:  publicKey.N,
+		C:   C,
+		X:   X,
+		G:   G,
+	}
+
+	// Prove that:
+	// X = G^x
+	// C = Encrypt(N0, x, rho)
+	proof := zkproofs.NewLogStarProof(witness, statement, ringPedersen)
+	assert.NoError(t, err)
+	assert.NotNil(t, proof)
+	assert.True(t, proof.Verify(statement, ringPedersen), "proof failed to verify")
+}
+
 func GenerateLogStarData(t *testing.T) (*zkproofs.LogStarWitness, *zkproofs.LogStarStatement) {
 	// witness
 	witness := &zkproofs.LogStarWitness{
