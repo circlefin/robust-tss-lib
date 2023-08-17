@@ -164,7 +164,10 @@ func NewSignRound3Message(
 	from *tss.PartyID,
 	delta *big.Int,
 	bigDelta *crypto.ECPoint,
+	H *big.Int,
 	psiPrimePrimeArray []*zkproofs.LogStarProof,
+	hProof *zkproofs.MulProof,
+	deltaProofArray []*zkproofs.DecProof,
 ) tss.ParsedMessage {
 	meta := tss.MessageRouting{
 		From:        from,
@@ -172,10 +175,15 @@ func NewSignRound3Message(
 	}
 	pBigDelta := PointToBytes(bigDelta)
 	pPsiPrimePrime := zkproofs.ProofArrayToBytes(psiPrimePrimeArray)
+	pDeltaProof := zkproofs.ProofArrayToBytes(deltaProofArray)
+	phProof := hProof.Bytes()
 	content := &SignRound3Message{
 		Delta:         delta.Bytes(),
+		H:             H.Bytes(),
 		BigDelta:      pBigDelta[:],
 		PsiPrimePrime: pPsiPrimePrime[:],
+		DeltaProof:    pDeltaProof[:],
+		HProof:        phProof[:],
 	}
 	msg := tss.NewMessageWrapper(meta, content)
 	return tss.NewMessage(meta, content, msg)
@@ -190,6 +198,10 @@ func (m *SignRound3Message) UnmarshalDelta() *big.Int {
 	return new(big.Int).SetBytes(m.GetDelta())
 }
 
+func (m *SignRound3Message) UnmarshalBigH() *big.Int {
+	return new(big.Int).SetBytes(m.GetH())
+}
+
 func (m *SignRound3Message) UnmarshalBigDelta(ec elliptic.Curve) (*crypto.ECPoint, error) {
 	bzs := m.GetBigDelta()
 	point, err := BytesToPoint(ec, bzs)
@@ -198,6 +210,14 @@ func (m *SignRound3Message) UnmarshalBigDelta(ec elliptic.Curve) (*crypto.ECPoin
 
 func (m *SignRound3Message) UnmarshalPsiPrimePrime(ec elliptic.Curve) ([]*zkproofs.LogStarProof, error) {
 	return zkproofs.ProofArrayFromBytes[*zkproofs.LogStarProof](ec, m.GetPsiPrimePrime())
+}
+
+func (m *SignRound3Message) UnmarshalDeltaProof(ec elliptic.Curve) ([]*zkproofs.DecProof, error) {
+	return zkproofs.ProofArrayFromBytes[*zkproofs.DecProof](ec, m.GetDeltaProof())
+}
+
+func (m *SignRound3Message) UnmarshalHProof() (*zkproofs.MulProof, error) {
+	return zkproofs.MulProofFromBytes(m.GetHProof())
 }
 
 /*

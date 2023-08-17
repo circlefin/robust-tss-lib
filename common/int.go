@@ -61,8 +61,8 @@ func (mi *modInt) ModInverse(g *big.Int) *big.Int {
 }
 
 func (mi *modInt) IsCongruent(a, b *big.Int) bool {
-    amodi := a.Mod(a, mi.i())
-    bmodi := b.Mod(b, mi.i())
+    amodi := new(big.Int).Mod(a, mi.i())
+    bmodi := new(big.Int).Mod(b, mi.i())
 	return amodi.Cmp(bmodi) == 0
 }
 

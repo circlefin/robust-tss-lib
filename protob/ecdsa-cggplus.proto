@@ -42,5 +42,8 @@ message SignRound2Message2 {
 message SignRound3Message {
     bytes delta = 1;
     repeated bytes bigDelta = 2;
-    repeated bytes psi_prime_prime = 3;
+    bytes h = 3;
+    repeated bytes psi_prime_prime = 4;
+    repeated bytes h_proof = 5;
+    repeated bytes delta_proof = 6;
 }

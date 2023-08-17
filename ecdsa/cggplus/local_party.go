@@ -74,14 +74,16 @@ type (
 		delta,
 		chi,
 		alpha,
-		alphaHat []*big.Int // [sender] -> self
+		alphaHat,
+		XDelta []*big.Int // [sender] -> self
 		Gamma    *crypto.ECPoint
 		bigDelta []*crypto.ECPoint
+		bigH        *big.Int
 
-		/*
-			// round 4
-			finalDeltaInv *big.Int
-
+		// round 4
+		finalDelta,
+		finalDeltaInv *big.Int
+/*
 			// round 5
 			bigS []*big.Int
 			m,
@@ -188,6 +190,7 @@ func NewLocalPartyWithKDD(
 	p.temp.delta = make([]*big.Int, partyCount)
 	p.temp.chi = make([]*big.Int, partyCount)
 	p.temp.bigDelta = make([]*crypto.ECPoint, partyCount)
+	p.temp.XDelta = make([]*big.Int, partyCount)
 	/*
 		p.temp.bigS = make([]*big.Int, partyCount)
 	*/

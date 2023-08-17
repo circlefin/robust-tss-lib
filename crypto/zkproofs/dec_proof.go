@@ -74,7 +74,7 @@ func NewDecProof(wit *DecWitness, stmt *DecStatement, rp *RingPedersenParams) *D
 	//A = (1+N0)^alpha * r^N0 mod N02
 	// we can ignore error when encrypting because we chose the range
 	pkN0 := &paillier.PublicKey{N: stmt.N0}
-	A, _ := pkN0.EncryptWithRandomness(alpha, r)
+	A := pkN0.EncryptWithRandomnessNoErrChk(alpha, r)
 
 	// gamma = alpha mod q
 	gamma := new(big.Int).Mod(alpha, stmt.Q)
@@ -118,10 +118,9 @@ func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 	e := proof.GetChallenge(stmt, rp)
 
 	// check (1+N0)^z1 * w^N0 mod N02 == A * C^e mod N02
-	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
-	N0plus1 := new(big.Int).Add(stmt.N0, big.NewInt(1))
-	left1 := PseudoPaillierEncrypt(N0plus1, proof.Z1, proof.W, stmt.N0, N02)
-	right1 := ATimesBToTheCModN(proof.A, stmt.C, e, N02)
+	pkN0 := &paillier.PublicKey{N: stmt.N0}
+	left1 := pkN0.EncryptWithRandomnessNoErrChk(proof.Z1, proof.W)
+	right1 := ATimesBToTheCModN(proof.A, stmt.C, e, pkN0.NSquare())
 	if left1.Cmp(right1) != 0 {
 		return false
 	}

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	//	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 
 	//	"github.com/bnb-chain/tss-lib/common"
 	//	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
@@ -85,7 +85,17 @@ func TestRound3(t *testing.T) {
 		go func(round *round3) {
 			defer wg.Done()
 			nextRound := &round4{round}
-			nextRound.VerifyRound3Messages(errChs)
+			for sender := range nextRound.Parties().IDs() {
+			    XDelta, _ := round3s[sender].ComputeXDelta()
+			    XDeltaPrime, _ := nextRound.ComputeXDelta(sender, round3s[sender].temp.bigH)
+			    assert.Equal(t, 0, XDelta.Cmp(XDeltaPrime))
+
+			    r3msg := nextRound.temp.signRound3Messages[sender].Content().(*SignRound3Message)
+                bigH := r3msg.UnmarshalBigH()
+			    XDeltaPrimPrimee, _ := nextRound.ComputeXDelta(sender, bigH)
+			    assert.Equal(t, 0, XDelta.Cmp(XDeltaPrimPrimee))
+			}
+    		nextRound.VerifyRound3Messages(errChs)
 		}(round)
 	}
 
@@ -93,6 +103,21 @@ func TestRound3(t *testing.T) {
 	close(errChs)
 	AssertNoErrors(t, errChs)
 }
+
+func testXDelta(t *testing.T, round *round4, i int) {
+	for j := range round.Parties().IDs() {
+		if j == i {
+			continue
+		}
+		if round.temp.bigD[j][i] == nil {
+		    t.Logf("round[%d] bigD[%d][%d] nil", round.PartyID().Index, j, i)
+		}
+		if round.temp.bigF[i][j] == nil {
+		    t.Logf("round[%d] bigF[%d][%d] nil", round.PartyID().Index, i, j)
+		}
+	}
+}
+
 
 /*
 func TestRound4(t *testing.T) {

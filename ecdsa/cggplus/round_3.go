@@ -47,7 +47,17 @@ func (round *round3) Start() *tss.Error {
 		return err
 	}
 
-	psiPrimePrime, err := round.ComputeProofs()
+	psiPrimePrime, err := round.ComputePsiPrimePrime()
+	if err != nil {
+		return err
+	}
+
+	HProof, err := round.ComputeHProof()
+	if err != nil {
+		return err
+	}
+
+	deltaProof, err := round.ComputeDeltaProof()
 	if err != nil {
 		return err
 	}
@@ -56,7 +66,10 @@ func (round *round3) Start() *tss.Error {
 		round.PartyID(),
 		round.temp.delta[i],
 		round.temp.bigDelta[i],
+		round.temp.bigH,
 		psiPrimePrime,
+		HProof,
+		deltaProof,
 	)
 	round.temp.signRound3Messages[i] = r3msg
 	round.out <- r3msg
@@ -293,7 +306,7 @@ func (round *round3) ComputeChi() {
 	round.temp.chi[i] = chi
 }
 
-func (round *round3) ComputeProofs() ([]*zkproofs.LogStarProof, *tss.Error) {
+func (round *round3) ComputePsiPrimePrime() ([]*zkproofs.LogStarProof, *tss.Error) {
 	round.ComputeDelta()
 	round.ComputeChi()
 	round.ComputeGamma()
@@ -333,6 +346,119 @@ func (round *round3) ComputeProofs() ([]*zkproofs.LogStarProof, *tss.Error) {
 	}
 	wg.Wait()
 	return psiPrimePrime, nil
+}
+
+func (round *round3) ComputeHProof() (*zkproofs.MulProof, *tss.Error) {
+	i := round.PartyID().Index
+	pki := round.key.PaillierPKs[i]
+	bigH, rho, err := pki.HomoMultAndReturnRandomness(round.temp.gamma, round.temp.bigK[i])
+	if err != nil {
+	    return nil, round.WrapError(fmt.Errorf("trouble computing bigH"))
+	}
+	round.temp.bigH = bigH
+	x, rhox, err := round.key.PaillierSK.DecryptFull(round.temp.bigG[i])
+	if err != nil || x.Cmp(round.temp.gamma) != 0 {
+		return nil, round.WrapError(fmt.Errorf("Bad G[i]"))
+	}
+
+	witness := &zkproofs.MulWitness{
+		X:    round.temp.gamma,
+		Rho:  rho,
+		Rhox: rhox,
+	}
+	statement := &zkproofs.MulStatement{
+		N: round.key.PaillierPKs[i].N,
+		X: round.temp.bigG[i],
+		Y: round.temp.bigK[i],
+		C: round.temp.bigH,
+	}
+	Hproof := zkproofs.NewMulProof(witness, statement)
+	if ! Hproof.Verify(statement) {
+	    return nil,  round.WrapError(fmt.Errorf("could not make Hproof"))
+	}
+	return Hproof, nil
+}
+
+func (round *round3) ComputeXDelta() (*big.Int, error) {
+	i := round.PartyID().Index
+	ski := round.key.PaillierSK
+	var err error
+	XDelta := round.temp.bigH
+	for j := range round.Parties().IDs() {
+		if j == i {
+			continue
+		}
+		XDelta, err = ski.PublicKey.HomoAdd(XDelta, round.temp.bigD[j][i])
+		if err != nil {
+		    return nil, fmt.Errorf("could not compute XDelta")
+		}
+		XDelta, err = ski.PublicKey.HomoAdd(XDelta, round.temp.bigF[i][j])
+		if err != nil {
+		    return nil, fmt.Errorf("could not compute XDelta")
+		}
+	}
+	return XDelta, nil
+}
+
+func (round *round3) ComputeDeltaProof() ([]*zkproofs.DecProof, *tss.Error) {
+	XDelta, err := round.ComputeXDelta()
+	if err != nil {
+	    return nil, round.WrapError(err)
+	}
+	i := round.PartyID().Index
+	ski := round.key.PaillierSK
+	q := round.Params().EC().Params().N
+
+	d, rho, err := ski.DecryptFull(XDelta)
+	if err != nil {
+		return nil, round.WrapError(fmt.Errorf("could not decrypt XDelta"))
+	}
+    if d.Cmp(ski.PublicKey.N) >= 0 {
+        return nil, round.WrapError(fmt.Errorf("d.Cmp(N) >= 0"))
+    }
+    if rho.Cmp(ski.PublicKey.N) >= 0 {
+        return nil, round.WrapError(fmt.Errorf("rho.Cmp(N) >= 0"))
+    }
+	newC, err := ski.PublicKey.EncryptWithRandomness(d, rho)
+	if err != nil {
+		return nil, round.WrapError(err)
+	}
+	if newC.Cmp(XDelta) != 0 {
+		return nil, round.WrapError(fmt.Errorf("badly formed XDelta rho"))
+	}
+
+	modQ := common.ModInt(q)
+	if !modQ.IsCongruent(d, round.temp.delta[i]) {
+		return nil, round.WrapError(fmt.Errorf("badly formed XDelta"))
+	}
+
+	statement := &zkproofs.DecStatement{
+		Q:   q,
+		Ell: zkproofs.GetEll(round.Params().EC()),
+		N0:  ski.PublicKey.N,
+		C:   XDelta,
+		X:   modQ.Mod(d), //round.temp.delta[i],
+	}
+	witness := &zkproofs.DecWitness{
+		Y:   d,
+		Rho: rho,
+	}
+	rpVs := round.key.GetAllRingPedersen()
+	rpVs[i] = nil
+	proofs := make([]*zkproofs.DecProof, len(rpVs))
+	wg := sync.WaitGroup{}
+	for j, rp := range rpVs {
+		if j == i {
+			continue
+		}
+		wg.Add(1)
+		go func(j int, rp *zkproofs.RingPedersenParams) {
+			defer wg.Done()
+			proofs[j] = zkproofs.NewDecProof(witness, statement, rp)
+		}(j, rp)
+	}
+	wg.Wait()
+	return proofs, nil
 }
 
 func (round *round3) Update() (bool, *tss.Error) {

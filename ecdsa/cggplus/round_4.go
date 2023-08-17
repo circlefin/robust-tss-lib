@@ -5,10 +5,10 @@ package cggplus
 import (
 	"errors"
 	"fmt"
-	//	"math/big"
+	"math/big"
 	"sync"
 
-	//	"github.com/bnb-chain/tss-lib/common"
+	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -48,6 +48,24 @@ func (round *round4) Start() *tss.Error {
 	return nil
 }
 
+func (round *round4) ComputeXDelta(i int, H *big.Int) (*big.Int, error) {
+    XDelta := H
+	for j := range round.Parties().IDs() {
+		if j == i {
+			continue
+		}
+		temp, err := round.key.PaillierPKs[i].HomoAdd(round.temp.bigD[j][i], round.temp.bigF[i][j])
+		if err != nil {
+		    return nil, err
+		}
+		XDelta, err = round.key.PaillierPKs[i].HomoAdd(XDelta, temp)
+		if err != nil {
+		    return nil, err
+		}
+	}
+    return XDelta, nil
+}
+
 func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 	wg := sync.WaitGroup{}
 	i := round.PartyID().Index
@@ -56,7 +74,6 @@ func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 		if i == j {
 			continue
 		}
-
 		wg.Add(1)
 		go func(sender int) {
 			defer wg.Done()
@@ -85,18 +102,67 @@ func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 				X:   round.temp.bigDelta[sender],
 				G:   round.temp.Gamma,
 			}
-			if statement.G == nil {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("Gamma is nil %d.", i)))
-				return
-			}
-
 			if !psiPrimePrime[i].Verify(statement, rp) {
 				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify proof from party %d.", sender)))
 				return
 			}
+
+			bigH := r3msg.UnmarshalBigH()
+			if bigH == nil {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent nil bigH.", sender)))
+				return
+			}
+			HProof, err := r3msg.UnmarshalHProof()
+			if err != nil {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent bad HProof.", sender)))
+				return
+			}
+        	statementH := &zkproofs.MulStatement{
+        		N: round.key.PaillierPKs[sender].N,
+        		X: round.temp.bigG[sender],
+        		Y: round.temp.bigK[sender],
+        		C: bigH,
+        	}
+			if !HProof.Verify(statementH) {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify HProof from party %d.", sender)))
+				return
+			}
+
+            XDelta, err := round.ComputeXDelta(sender, bigH)
+            if err != nil {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to compute XDelta for party %d.", sender)))
+				return
+            }
+			deltaProof, err := r3msg.UnmarshalDeltaProof(round.Params().EC())
+			if err != nil {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent bad deltaProof.", sender)))
+				return
+			}
+        	statementDelta := &zkproofs.DecStatement{
+        		Q:   round.Params().EC().Params().N,
+        		Ell: zkproofs.GetEll(round.Params().EC()),
+        		N0:  round.key.PaillierPKs[sender].N,
+        		C:   XDelta,
+        		X:   round.temp.delta[sender],
+        	}
+			if !deltaProof[i].Verify(statementDelta, rp) {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify XDeltaProof from party %d.", sender)))
+				return
+			}
+
 		}(j)
 	}
 	wg.Wait()
+
+}
+
+func (round *round4) ComputeDelta() {
+	modQ := common.ModInt(round.Params().EC().Params().N)
+	delta := big.NewInt(0)
+	for _, deltaJ := range round.temp.delta {
+		delta = modQ.Add(delta, deltaJ)
+	}
+	round.temp.finalDelta = delta
 }
 
 /*

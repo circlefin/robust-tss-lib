@@ -39,6 +39,47 @@ func TestDecProof(t *testing.T) {
 	assert.True(t, proof.Verify(statement, ringPedersen))
 }
 
+func TestDecSumProof(t *testing.T) {
+	setUp(t)
+
+    sumX := big.NewInt(20)
+    one, _ := publicKey.Encrypt(big.NewInt(1))
+	sumBigX, _, err := publicKey.HomoMultAndReturnRandomness(sumX, one)
+    assert.NoError(t, err)
+    for i := 0; i<60; i++ {
+        x := common.GetRandomPositiveInt(q)
+        X, err := publicKey.Encrypt(x)
+        assert.NoError(t, err)
+        sumX = common.ModInt(q).Add(sumX, x)
+        sumBigX, err = publicKey.HomoAdd(sumBigX, X)
+        assert.NoError(t, err)
+    }
+
+    sum, rho, err := privateKey.DecryptFull(sumBigX)
+
+	// witness
+	witness := &zkproofs.DecWitness{
+		Y:   sum,
+		Rho: rho,
+	}
+	statement := &zkproofs.DecStatement{
+		Q:   q,
+		Ell: ell,
+		N0:  publicKey.N,
+		C:   sumBigX,
+		X:   sumX,
+	}
+
+	// Prove that:
+	// C = Encrypt(N0, x, rho)
+	// y = x mod q
+	proof := zkproofs.NewDecProof(witness, statement, ringPedersen)
+	assert.NotNil(t, proof)
+	assert.False(t, proof.Nil())
+	assert.True(t, proof.Verify(statement, ringPedersen))
+}
+
+
 func GenerateDecProofData(t *testing.T) (*zkproofs.DecWitness, *zkproofs.DecStatement) {
 	y := common.GetRandomPositiveInt(publicKey.N)
 	x := new(big.Int).Mod(y, q)
