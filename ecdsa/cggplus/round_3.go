@@ -353,7 +353,7 @@ func (round *round3) ComputeHProof() (*zkproofs.MulProof, *tss.Error) {
 	pki := round.key.PaillierPKs[i]
 	bigH, rho, err := pki.HomoMultAndReturnRandomness(round.temp.gamma, round.temp.bigK[i])
 	if err != nil {
-	    return nil, round.WrapError(fmt.Errorf("trouble computing bigH"))
+		return nil, round.WrapError(fmt.Errorf("trouble computing bigH"))
 	}
 	round.temp.bigH = bigH
 	x, rhox, err := round.key.PaillierSK.DecryptFull(round.temp.bigG[i])
@@ -373,8 +373,8 @@ func (round *round3) ComputeHProof() (*zkproofs.MulProof, *tss.Error) {
 		C: round.temp.bigH,
 	}
 	Hproof := zkproofs.NewMulProof(witness, statement)
-	if ! Hproof.Verify(statement) {
-	    return nil,  round.WrapError(fmt.Errorf("could not make Hproof"))
+	if !Hproof.Verify(statement) {
+		return nil, round.WrapError(fmt.Errorf("could not make Hproof"))
 	}
 	return Hproof, nil
 }
@@ -390,11 +390,11 @@ func (round *round3) ComputeXDelta() (*big.Int, error) {
 		}
 		XDelta, err = ski.PublicKey.HomoAdd(XDelta, round.temp.bigD[j][i])
 		if err != nil {
-		    return nil, fmt.Errorf("could not compute XDelta")
+			return nil, fmt.Errorf("could not compute XDelta")
 		}
 		XDelta, err = ski.PublicKey.HomoAdd(XDelta, round.temp.bigF[i][j])
 		if err != nil {
-		    return nil, fmt.Errorf("could not compute XDelta")
+			return nil, fmt.Errorf("could not compute XDelta")
 		}
 	}
 	return XDelta, nil
@@ -403,7 +403,7 @@ func (round *round3) ComputeXDelta() (*big.Int, error) {
 func (round *round3) ComputeDeltaProof() ([]*zkproofs.DecProof, *tss.Error) {
 	XDelta, err := round.ComputeXDelta()
 	if err != nil {
-	    return nil, round.WrapError(err)
+		return nil, round.WrapError(err)
 	}
 	i := round.PartyID().Index
 	ski := round.key.PaillierSK
@@ -413,12 +413,12 @@ func (round *round3) ComputeDeltaProof() ([]*zkproofs.DecProof, *tss.Error) {
 	if err != nil {
 		return nil, round.WrapError(fmt.Errorf("could not decrypt XDelta"))
 	}
-    if d.Cmp(ski.PublicKey.N) >= 0 {
-        return nil, round.WrapError(fmt.Errorf("d.Cmp(N) >= 0"))
-    }
-    if rho.Cmp(ski.PublicKey.N) >= 0 {
-        return nil, round.WrapError(fmt.Errorf("rho.Cmp(N) >= 0"))
-    }
+	if d.Cmp(ski.PublicKey.N) >= 0 {
+		return nil, round.WrapError(fmt.Errorf("d.Cmp(N) >= 0"))
+	}
+	if rho.Cmp(ski.PublicKey.N) >= 0 {
+		return nil, round.WrapError(fmt.Errorf("rho.Cmp(N) >= 0"))
+	}
 	newC, err := ski.PublicKey.EncryptWithRandomness(d, rho)
 	if err != nil {
 		return nil, round.WrapError(err)

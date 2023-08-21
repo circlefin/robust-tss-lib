@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/bnb-chain/tss-lib/common"
+	"github.com/bnb-chain/tss-lib/crypto"
 	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/tss"
 )
@@ -29,41 +30,35 @@ func (round *round4) Start() *tss.Error {
 	if err != nil {
 		return err
 	}
-	/*
-		err = round.ComputeFinalDelta()
-		if err != nil {
-			return err
-		}
 
-		proofs, err := round.ComputeProofs()
-		if err != nil {
-			return err
-		}
+	err = round.ComputeValues()
+	if err != nil {
+		return err
+	}
 
-		i := round.PartyID().Index
-		r4msg := NewSignRound4Message(round.PartyID(), round.temp.pointGamma[i], proofs)
-		round.temp.signRound4Messages[i] = r4msg
-		round.out <- r4msg
-	*/
+	i := round.PartyID().Index
+	r4msg := NewSignRound4Message(round.PartyID())
+	round.temp.signRound4Messages[i] = r4msg
+	round.out <- r4msg
 	return nil
 }
 
 func (round *round4) ComputeXDelta(i int, H *big.Int) (*big.Int, error) {
-    XDelta := H
+	XDelta := H
 	for j := range round.Parties().IDs() {
 		if j == i {
 			continue
 		}
 		temp, err := round.key.PaillierPKs[i].HomoAdd(round.temp.bigD[j][i], round.temp.bigF[i][j])
 		if err != nil {
-		    return nil, err
+			return nil, err
 		}
 		XDelta, err = round.key.PaillierPKs[i].HomoAdd(XDelta, temp)
 		if err != nil {
-		    return nil, err
+			return nil, err
 		}
 	}
-    return XDelta, nil
+	return XDelta, nil
 }
 
 func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
@@ -117,34 +112,34 @@ func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent bad HProof.", sender)))
 				return
 			}
-        	statementH := &zkproofs.MulStatement{
-        		N: round.key.PaillierPKs[sender].N,
-        		X: round.temp.bigG[sender],
-        		Y: round.temp.bigK[sender],
-        		C: bigH,
-        	}
+			statementH := &zkproofs.MulStatement{
+				N: round.key.PaillierPKs[sender].N,
+				X: round.temp.bigG[sender],
+				Y: round.temp.bigK[sender],
+				C: bigH,
+			}
 			if !HProof.Verify(statementH) {
 				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify HProof from party %d.", sender)))
 				return
 			}
 
-            XDelta, err := round.ComputeXDelta(sender, bigH)
-            if err != nil {
+			XDelta, err := round.ComputeXDelta(sender, bigH)
+			if err != nil {
 				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to compute XDelta for party %d.", sender)))
 				return
-            }
+			}
 			deltaProof, err := r3msg.UnmarshalDeltaProof(round.Params().EC())
 			if err != nil {
 				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent bad deltaProof.", sender)))
 				return
 			}
-        	statementDelta := &zkproofs.DecStatement{
-        		Q:   round.Params().EC().Params().N,
-        		Ell: zkproofs.GetEll(round.Params().EC()),
-        		N0:  round.key.PaillierPKs[sender].N,
-        		C:   XDelta,
-        		X:   round.temp.delta[sender],
-        	}
+			statementDelta := &zkproofs.DecStatement{
+				Q:   round.Params().EC().Params().N,
+				Ell: zkproofs.GetEll(round.Params().EC()),
+				N0:  round.key.PaillierPKs[sender].N,
+				C:   XDelta,
+				X:   round.temp.delta[sender],
+			}
 			if !deltaProof[i].Verify(statementDelta, rp) {
 				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify XDeltaProof from party %d.", sender)))
 				return
@@ -156,66 +151,35 @@ func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 
 }
 
-func (round *round4) ComputeDelta() {
+func (round *round4) ComputeValues() *tss.Error {
 	modQ := common.ModInt(round.Params().EC().Params().N)
 	delta := big.NewInt(0)
-	for _, deltaJ := range round.temp.delta {
+	var sumBigDelta *crypto.ECPoint
+	var err error
+	for j, deltaJ := range round.temp.delta {
+		if j == 0 {
+			sumBigDelta = round.temp.bigDelta[j]
+		} else {
+			sumBigDelta, err = sumBigDelta.Add(round.temp.bigDelta[j])
+		}
+		if err != nil {
+			return round.WrapError(errors.New(fmt.Sprintf("Unexpected error computing delta.")))
+		}
 		delta = modQ.Add(delta, deltaJ)
 	}
+	expectedSum := crypto.ScalarBaseMult(round.Params().EC(), delta)
+	if !expectedSum.Equals(sumBigDelta) {
+		return round.WrapError(errors.New(fmt.Sprintf("Unexpected error computing delta.")))
+	}
+
 	round.temp.finalDelta = delta
+	round.temp.finalDeltaInv = modQ.ModInverse(delta)
+	round.temp.bigR = round.temp.Gamma.ScalarMult(round.temp.finalDeltaInv)
+	round.temp.rx = round.temp.bigR.X()
+	round.temp.ry = round.temp.bigR.Y()
+	return nil
 }
 
-/*
-	func (round *round4) ComputeFinalDelta() *tss.Error {
-		delta := big.NewInt(0)
-		modN := common.ModInt(round.Params().EC().Params().N)
-		for j, deltaJ := range round.temp.delta {
-			if deltaJ == nil {
-				return round.WrapError(errors.New(fmt.Sprintf("%d: nil delta[%d].", round.PartyID().Index, j)))
-			}
-			delta = modN.Add(delta, deltaJ)
-		}
-		round.temp.finalDeltaInv = modN.ModInverse(delta)
-		return nil
-	}
-
-	func (round *round4) ComputeProofs() (proofs []*zkproofs.LogStarProof, err *tss.Error) {
-		wg := sync.WaitGroup{}
-		i := round.PartyID().Index
-		err = nil
-		statement := &zkproofs.LogStarStatement{
-			Ell: zkproofs.GetEll(round.Params().EC()),
-			N0:  round.key.PaillierSK.N,
-			C:   round.temp.Xgamma[i],
-			X:   round.temp.pointGamma[i],
-		}
-		witness := &zkproofs.LogStarWitness{
-			X:   round.temp.gamma,
-			Rho: round.temp.rhoxgamma,
-		}
-
-		proofs = make([]*zkproofs.LogStarProof, len(round.Parties().IDs()))
-		rpVs := round.key.GetAllRingPedersen()
-		for j, rp := range rpVs {
-			if i == j {
-				continue
-			}
-			wg.Add(1)
-			go func(j int, rp *zkproofs.RingPedersenParams) {
-				defer wg.Done()
-				proofs[j] = zkproofs.NewLogStarProof(witness, statement, rp)
-			}(j, rp)
-		}
-		wg.Wait()
-
-		for j, pf := range proofs {
-			if j != i && pf.IsNil() {
-				return proofs, round.WrapError(fmt.Errorf("Failed to create proof [%d]->[%d].", i, j))
-			}
-		}
-		return proofs, nil
-	}
-*/
 func (round *round4) Update() (bool, *tss.Error) {
 	for j, msg := range round.temp.signRound4Messages {
 		if round.ok[j] {
@@ -230,9 +194,9 @@ func (round *round4) Update() (bool, *tss.Error) {
 }
 
 func (round *round4) CanAccept(msg tss.ParsedMessage) bool {
-	//	if _, ok := msg.Content().(*SignRound4Message); ok {
-	return msg.IsBroadcast()
-	//	}
+	if _, ok := msg.Content().(*SignRound4Message); ok {
+		return msg.IsBroadcast()
+	}
 	return false
 }
 

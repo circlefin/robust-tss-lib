@@ -78,20 +78,21 @@ type (
 		XDelta []*big.Int // [sender] -> self
 		Gamma    *crypto.ECPoint
 		bigDelta []*crypto.ECPoint
-		bigH        *big.Int
+		bigH     *big.Int
 
 		// round 4
 		finalDelta,
-		finalDeltaInv *big.Int
-/*
+		finalDeltaInv,
+		rx,
+		ry *big.Int
+		bigR *crypto.ECPoint
+		/*
 			// round 5
 			bigS []*big.Int
 			m,
 			sigma,
 			si,
-			rx,
-			ry *big.Int
-			bigR *crypto.ECPoint */
+		*/
 	}
 )
 
@@ -159,8 +160,8 @@ func NewLocalPartyWithKDD(
 	p.temp.signRound2Message1s = Make2DParsedMessage(partyCount)
 	p.temp.signRound2Message2s = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound3Messages = make([]tss.ParsedMessage, partyCount)
-	/*	p.temp.signRound4Messages = make([]tss.ParsedMessage, partyCount)
-		p.temp.signRound5Messages = make([]tss.ParsedMessage, partyCount)
+	p.temp.signRound4Messages = make([]tss.ParsedMessage, partyCount)
+	/*	p.temp.signRound5Messages = make([]tss.ParsedMessage, partyCount)
 		p.temp.signRound6Messages = make([]tss.ParsedMessage, partyCount)
 		p.temp.signRound7Messages = make([]tss.ParsedMessage, partyCount)
 		p.temp.signRound8Messages = make([]tss.ParsedMessage, partyCount)
@@ -280,10 +281,10 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 		p.temp.signRound2Message2s[fromPIdx] = msg
 	case *SignRound3Message:
 		p.temp.signRound3Messages[fromPIdx] = msg
-	/*		case *SignRound4Message:
-				p.temp.signRound4Messages[fromPIdx] = msg
-			case *SignRound5Message:
-				p.temp.signRound5Messages[fromPIdx] = msg */
+	case *SignRound4Message:
+		p.temp.signRound4Messages[fromPIdx] = msg
+		/*	case *SignRound5Message:
+			p.temp.signRound5Messages[fromPIdx] = msg */
 	default: // unrecognised message, just ignore!
 		common.Logger.Warningf("unrecognised message ignored: %v", msg)
 		return false, nil

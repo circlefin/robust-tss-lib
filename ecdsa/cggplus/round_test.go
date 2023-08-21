@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	//	"github.com/stretchr/testify/assert"
 
 	//	"github.com/bnb-chain/tss-lib/common"
 	//	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
@@ -64,7 +64,7 @@ func TestRound2(t *testing.T) {
 
 }
 */
-
+/*
 func TestRound3(t *testing.T) {
 	params, parties, outCh, _, _, _ := SetupParties(t)
 	t.Logf("round 1")
@@ -103,6 +103,20 @@ func TestRound3(t *testing.T) {
 	close(errChs)
 	AssertNoErrors(t, errChs)
 }
+*/
+
+func TestRound4(t *testing.T) {
+	params, parties, outCh, _, _, _ := SetupParties(t)
+	t.Logf("round 1")
+	round1s := RunRound1(t, params, parties, outCh)
+	t.Logf("round 2")
+	totalMessages := len(parties) * len(parties)
+	round2s := RunRound[*round1, *round2](t, params, parties, round1s, totalMessages, outCh)
+	t.Logf("round 3")
+	round3s := RunRound[*round2, *round3](t, params, parties, round2s, len(parties), outCh)
+	t.Logf("round 3")
+	_ = RunRound[*round3, *round4](t, params, parties, round3s, len(parties), outCh)
+}
 
 func testXDelta(t *testing.T, round *round4, i int) {
 	for j := range round.Parties().IDs() {
@@ -110,14 +124,13 @@ func testXDelta(t *testing.T, round *round4, i int) {
 			continue
 		}
 		if round.temp.bigD[j][i] == nil {
-		    t.Logf("round[%d] bigD[%d][%d] nil", round.PartyID().Index, j, i)
+			t.Logf("round[%d] bigD[%d][%d] nil", round.PartyID().Index, j, i)
 		}
 		if round.temp.bigF[i][j] == nil {
-		    t.Logf("round[%d] bigF[%d][%d] nil", round.PartyID().Index, i, j)
+			t.Logf("round[%d] bigF[%d][%d] nil", round.PartyID().Index, i, j)
 		}
 	}
 }
-
 
 /*
 func TestRound4(t *testing.T) {

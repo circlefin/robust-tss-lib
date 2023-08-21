@@ -220,6 +220,22 @@ func (m *SignRound3Message) UnmarshalHProof() (*zkproofs.MulProof, error) {
 	return zkproofs.MulProofFromBytes(m.GetHProof())
 }
 
+func NewSignRound4Message(
+	from *tss.PartyID,
+) tss.ParsedMessage {
+	meta := tss.MessageRouting{
+		From:        from,
+		IsBroadcast: true,
+	}
+	content := &SignRound4Message{}
+	msg := tss.NewMessageWrapper(meta, content)
+	return tss.NewMessage(meta, content, msg)
+}
+
+func (m *SignRound4Message) ValidateBasic() bool {
+	return true
+}
+
 /*
 func NewSignRound1Message2(
 
