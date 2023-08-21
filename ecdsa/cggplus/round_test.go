@@ -104,7 +104,7 @@ func TestRound3(t *testing.T) {
 	AssertNoErrors(t, errChs)
 }
 */
-
+/*
 func TestRound4(t *testing.T) {
 	params, parties, outCh, _, _, _ := SetupParties(t)
 	t.Logf("round 1")
@@ -114,8 +114,42 @@ func TestRound4(t *testing.T) {
 	round2s := RunRound[*round1, *round2](t, params, parties, round1s, totalMessages, outCh)
 	t.Logf("round 3")
 	round3s := RunRound[*round2, *round3](t, params, parties, round2s, len(parties), outCh)
-	t.Logf("round 3")
+	t.Logf("round 4")
 	_ = RunRound[*round3, *round4](t, params, parties, round3s, len(parties), outCh)
+
+	// no need to verify output as round4 has empty message
+}*/
+
+func TestRound5(t *testing.T) {
+	params, parties, outCh, _, _, _ := SetupParties(t)
+	t.Logf("round 1")
+	round1s := RunRound1(t, params, parties, outCh)
+	t.Logf("round 2")
+	totalMessages := len(parties) * len(parties)
+	round2s := RunRound[*round1, *round2](t, params, parties, round1s, totalMessages, outCh)
+	t.Logf("round 3")
+	round3s := RunRound[*round2, *round3](t, params, parties, round2s, len(parties), outCh)
+	t.Logf("round 4")
+	round4s := RunRound[*round3, *round4](t, params, parties, round3s, len(parties), outCh)
+	t.Logf("round 5")
+	round5s := RunRound[*round4, *round5](t, params, parties, round4s, len(parties), outCh)
+
+	t.Logf("verifying")
+	wg := sync.WaitGroup{}
+	partyCount := len(parties)
+	errChs := make(chan *tss.Error, partyCount*partyCount*partyCount)
+	for _, round := range round5s {
+		wg.Add(1)
+		go func(round *round5) {
+			defer wg.Done()
+			nextRound := &finalization{round}
+			nextRound.VerifyRound5Messages(errChs)
+		}(round)
+	}
+
+	wg.Wait()
+	close(errChs)
+	AssertNoErrors(t, errChs)
 }
 
 func testXDelta(t *testing.T, round *round4, i int) {

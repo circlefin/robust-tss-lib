@@ -72,7 +72,7 @@ type (
 
 		// round 3
 		delta,
-		chi,
+		chi, // likely just one chi not array
 		alpha,
 		alphaHat,
 		XDelta []*big.Int // [sender] -> self
@@ -86,13 +86,12 @@ type (
 		rx,
 		ry *big.Int
 		bigR *crypto.ECPoint
-		/*
-			// round 5
-			bigS []*big.Int
-			m,
-			sigma,
-			si,
-		*/
+
+		// round 5
+		sigma *big.Int
+
+		// finalization
+		bigSigma []*big.Int
 	}
 )
 
@@ -161,11 +160,7 @@ func NewLocalPartyWithKDD(
 	p.temp.signRound2Message2s = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound3Messages = make([]tss.ParsedMessage, partyCount)
 	p.temp.signRound4Messages = make([]tss.ParsedMessage, partyCount)
-	/*	p.temp.signRound5Messages = make([]tss.ParsedMessage, partyCount)
-		p.temp.signRound6Messages = make([]tss.ParsedMessage, partyCount)
-		p.temp.signRound7Messages = make([]tss.ParsedMessage, partyCount)
-		p.temp.signRound8Messages = make([]tss.ParsedMessage, partyCount)
-		p.temp.signRound9Messages = make([]tss.ParsedMessage, partyCount)*/
+	p.temp.signRound5Messages = make([]tss.ParsedMessage, partyCount)
 
 	// temp data init
 	p.temp.keyDerivationDelta = keyDerivationDelta
@@ -192,9 +187,10 @@ func NewLocalPartyWithKDD(
 	p.temp.chi = make([]*big.Int, partyCount)
 	p.temp.bigDelta = make([]*crypto.ECPoint, partyCount)
 	p.temp.XDelta = make([]*big.Int, partyCount)
-	/*
-		p.temp.bigS = make([]*big.Int, partyCount)
-	*/
+
+	// finalization
+	p.temp.bigSigma = make([]*big.Int, partyCount)
+
 	return p
 }
 
@@ -283,8 +279,8 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 		p.temp.signRound3Messages[fromPIdx] = msg
 	case *SignRound4Message:
 		p.temp.signRound4Messages[fromPIdx] = msg
-		/*	case *SignRound5Message:
-			p.temp.signRound5Messages[fromPIdx] = msg */
+	case *SignRound5Message:
+		p.temp.signRound5Messages[fromPIdx] = msg
 	default: // unrecognised message, just ignore!
 		common.Logger.Warningf("unrecognised message ignored: %v", msg)
 		return false, nil

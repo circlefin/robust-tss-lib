@@ -53,3 +53,13 @@ message SignRound3Message {
  */
 message SignRound4Message {
 }
+
+/*
+  * Represents a broadcast message during Round 5 of the accountable cgg+ ECDSA TSS signing protocol.
+  */
+ message SignRound5Message {
+     bytes sigma = 1;
+     bytes big_h_hat = 2;
+     repeated bytes big_h_hat_proof = 3;
+     repeated bytes big_sigma_proof = 4;
+ }

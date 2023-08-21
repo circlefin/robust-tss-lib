@@ -171,8 +171,16 @@ func (proof *MulStarProof) Nil() bool {
 	return false
 }
 
-func (proof *MulStarProof) Bytes() [MulStarProofParts][]byte {
-	return [...][]byte{
+func (proof *MulStarProof) IsNil() bool {
+	return proof == nil
+}
+
+func (proof *MulStarProof) Parts() int {
+	return MulStarProofParts
+}
+
+func (proof *MulStarProof) Bytes() [][]byte {
+	return [][]byte{
 		proof.A.Bytes(),
 		proof.Bx.X().Bytes(),
 		proof.Bx.Y().Bytes(),
@@ -184,7 +192,7 @@ func (proof *MulStarProof) Bytes() [MulStarProofParts][]byte {
 	}
 }
 
-func MulStarProofFromBytes(ec elliptic.Curve, bzs [][]byte) (*MulStarProof, error) {
+func (proof *MulStarProof) ProofFromBytes(ec elliptic.Curve, bzs [][]byte) (Proof, error) {
 	if !common.NonEmptyMultiBytes(bzs, MulStarProofParts) {
 		return nil, fmt.Errorf("expected %d byte parts to construct MulStarProof", MulStarProofParts)
 	}

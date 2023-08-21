@@ -18,7 +18,8 @@ var (
 		(*SignRound2Message1)(nil),
 		(*SignRound2Message2)(nil),
 		(*SignRound3Message)(nil),
-		/*		(*SignRound4Message)(nil),*/
+		(*SignRound4Message)(nil),
+		(*SignRound5Message)(nil),
 	}
 )
 
@@ -234,6 +235,50 @@ func NewSignRound4Message(
 
 func (m *SignRound4Message) ValidateBasic() bool {
 	return true
+}
+
+func NewSignRound5Message(
+	from *tss.PartyID,
+	sigma, bigHHat *big.Int,
+	bigHHatProofArray []*zkproofs.MulStarProof,
+	bigSigmaProofArray []*zkproofs.DecProof,
+) tss.ParsedMessage {
+	meta := tss.MessageRouting{
+		From:        from,
+		IsBroadcast: true,
+	}
+	pBigHHatProof := zkproofs.ProofArrayToBytes(bigHHatProofArray)
+	pBigSigmaProof := zkproofs.ProofArrayToBytes(bigSigmaProofArray)
+	content := &SignRound5Message{
+		Sigma:         sigma.Bytes(),
+		BigHHat:       bigHHat.Bytes(),
+		BigHHatProof:  pBigHHatProof[:],
+		BigSigmaProof: pBigSigmaProof[:],
+	}
+	msg := tss.NewMessageWrapper(meta, content)
+	return tss.NewMessage(meta, content, msg)
+}
+
+func (m *SignRound5Message) ValidateBasic() bool {
+	return m != nil &&
+		common.NonEmptyBytes(m.GetSigma()) &&
+		common.NonEmptyBytes(m.GetBigHHat())
+}
+
+func (m *SignRound5Message) UnmarshalSigma() *big.Int {
+	return new(big.Int).SetBytes(m.GetSigma())
+}
+
+func (m *SignRound5Message) UnmarshalBigHHat() *big.Int {
+	return new(big.Int).SetBytes(m.GetBigHHat())
+}
+
+func (m *SignRound5Message) UnmarshalBigHHatProof(ec elliptic.Curve) ([]*zkproofs.MulStarProof, error) {
+	return zkproofs.ProofArrayFromBytes[*zkproofs.MulStarProof](ec, m.GetBigHHatProof())
+}
+
+func (m *SignRound5Message) UnmarshalSigmaProof(ec elliptic.Curve) ([]*zkproofs.DecProof, error) {
+	return zkproofs.ProofArrayFromBytes[*zkproofs.DecProof](ec, m.GetBigSigmaProof())
 }
 
 /*
