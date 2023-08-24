@@ -4,7 +4,6 @@ package cggplus
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -39,7 +38,7 @@ func (round *round5) Start() *tss.Error {
 	round.temp.signRound5Messages[round.PartyID().Index] = r5msg
 	round.out <- r5msg
 
-	//	round.temp.CleanUpPreSigningData()
+	round.CleanUpRound5Data()
 	return nil
 }
 
@@ -52,7 +51,7 @@ func (round *round5) ComputeVals() (bigHHat *big.Int, bigHHatProof []*zkproofs.M
 
 	bigHHat, rho, err := pki.HomoMultAndReturnRandomness(round.temp.w, round.temp.bigK[i])
 	if err != nil {
-		terr = round.WrapError(fmt.Errorf("could not decrypt D"))
+		terr = round.WrapError(errors.New("could not compute bigHHat"))
 	}
 	witnessBigHHat := &zkproofs.MulStarWitness{
 		X:   round.temp.w,
@@ -66,7 +65,7 @@ func (round *round5) ComputeVals() (bigHHat *big.Int, bigHHatProof []*zkproofs.M
 		X:   round.temp.bigWs[i],
 	}
 
-	sigma := modQ.Add(modQ.Mul(round.temp.m, round.temp.k), modQ.Mul(round.temp.rx, round.temp.chi[i]))
+	sigma := modQ.Add(modQ.Mul(round.temp.m, round.temp.k), modQ.Mul(round.temp.rx, round.temp.chi))
 	prod := bigHHat
 	for j := range round.Parties().IDs() {
 		if j == i {
@@ -74,36 +73,36 @@ func (round *round5) ComputeVals() (bigHHat *big.Int, bigHHatProof []*zkproofs.M
 		}
 		temp, err := round.key.PaillierPKs[i].HomoAdd(round.temp.bigDHat[j][i], round.temp.bigFHat[i][j])
 		if err != nil {
-			terr = round.WrapError(fmt.Errorf("could not compute bigSigma a"))
+			terr = round.WrapError(errors.New("could not compute bigSigma"))
 			return
 		}
 		prod, err = round.key.PaillierPKs[i].HomoAdd(prod, temp)
 		if err != nil {
-			terr = round.WrapError(fmt.Errorf("could not compute bigSigma b"))
+			terr = round.WrapError(errors.New("could not compute bigSigma"))
 			return
 		}
 	}
 	prod, err = pki.HomoMult(round.temp.rx, prod)
 	if err != nil {
-		terr = round.WrapError(fmt.Errorf("could not compute bigSigma c"))
+		terr = round.WrapError(errors.New("could not compute bigSigma"))
 		return
 	}
 	prodPrime, err := pki.HomoMult(round.temp.m, round.temp.bigK[i])
 	if err != nil {
-		terr = round.WrapError(fmt.Errorf("could not compute bigSigma d"))
+		terr = round.WrapError(errors.New("could not compute bigSigma"))
 		return
 	}
 	bigSigma, err := pki.HomoAdd(prod, prodPrime)
 	if err != nil {
-		terr = round.WrapError(fmt.Errorf("could not compute bigSigma e"))
+		terr = round.WrapError(errors.New("could not compute bigSigma"))
 		return
 	}
 	littleSigma, rhoSigma, err := round.key.PaillierSK.DecryptFull(bigSigma)
 	if err != nil {
-		terr = round.WrapError(fmt.Errorf("could not compute bigSigma f"))
+		terr = round.WrapError(errors.New("could not compute bigSigma"))
 	}
 	if !modQ.IsCongruent(sigma, littleSigma) {
-		terr = round.WrapError(fmt.Errorf("could not compute bigSigma g"))
+		terr = round.WrapError(errors.New("could not compute bigSigma"))
 		return
 	}
 	witnessSigma := &zkproofs.DecWitness{
@@ -119,7 +118,6 @@ func (round *round5) ComputeVals() (bigHHat *big.Int, bigHHatProof []*zkproofs.M
 	}
 
 	wg := sync.WaitGroup{}
-	err = nil
 	rpVs := round.key.GetAllRingPedersen()
 	rpVs[i] = nil
 	for j, rp := range rpVs {
@@ -130,28 +128,25 @@ func (round *round5) ComputeVals() (bigHHat *big.Int, bigHHatProof []*zkproofs.M
 		go func(j int, rp *zkproofs.RingPedersenParams) {
 			defer wg.Done()
 			bigHHatProof[j] = zkproofs.NewMulStarProof(witnessBigHHat, statementBigHHat, rp)
-			if !bigHHatProof[j].Verify(statementBigHHat, rp) {
-				err = fmt.Errorf("could not compute bigHHatProof")
-			}
 		}(j, rp)
 		go func(j int, rp *zkproofs.RingPedersenParams) {
 			defer wg.Done()
 			sigmaProof[j] = zkproofs.NewDecProof(witnessSigma, statementSigma, rp)
-			if !sigmaProof[j].Verify(statementSigma, rp) {
-				err = fmt.Errorf("could not compute bigSigma proof")
-			}
 		}(j, rp)
 	}
 	wg.Wait()
-	if err != nil {
-		terr = round.WrapError(err)
-	}
 	round.temp.sigma = sigma
 	return
 }
 
+func (round *round5) CleanUpRound5Data() {
+	round.temp.w = nil
+	round.temp.k = nil
+	round.temp.chi = nil
+}
+
 func (round *round5) Update() (bool, *tss.Error) {
-	/*	for j, msg := range round.temp.signRound5Messages {
+	for j, msg := range round.temp.signRound5Messages {
 		if round.ok[j] {
 			continue
 		}
@@ -159,15 +154,15 @@ func (round *round5) Update() (bool, *tss.Error) {
 			return false, nil
 		}
 		round.ok[j] = true
-	}*/
+	}
 	return true, nil
 }
 
 func (round *round5) CanAccept(msg tss.ParsedMessage) bool {
-	//	if _, ok := msg.Content().(*SignRound5Message); ok {
-	return msg.IsBroadcast()
-	// }
-	// return false
+	if _, ok := msg.Content().(*SignRound5Message); ok {
+		return msg.IsBroadcast()
+	}
+	return false
 }
 
 func (round *round5) NextRound() tss.Round {

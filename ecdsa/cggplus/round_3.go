@@ -4,7 +4,6 @@ package cggplus
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -80,7 +79,7 @@ func (round *round3) Start() *tss.Error {
 func (round *round3) VerifyRound2Messages(errChs chan *tss.Error) {
 	i := round.PartyID().Index
 	wg := sync.WaitGroup{}
-	for sender, _ := range round.Parties().IDs() {
+	for sender, Psender := range round.Parties().IDs() {
 		for recipient, _ := range round.Parties().IDs() {
 			if sender == recipient || sender == i {
 				continue
@@ -88,21 +87,21 @@ func (round *round3) VerifyRound2Messages(errChs chan *tss.Error) {
 			wg.Add(1)
 			go func(sender, recipient int, errChs chan *tss.Error) {
 				defer wg.Done()
-				round.VerifyRound2Message(sender, recipient, errChs)
+				round.VerifyRound2Message(sender, recipient, Psender, errChs)
 			}(sender, recipient, errChs)
 		}
 	}
 	wg.Wait()
 }
 
-func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss.Error) {
+func (round *round3) VerifyRound2Message(sender, recipient int, Psender *tss.PartyID, errChs chan *tss.Error) {
 	verifier := round.PartyID().Index
 	rpVerifier := round.key.GetRingPedersen(verifier)
 	ec := round.Params().EC()
 
 	r2msg1 := round.temp.signRound2Message1s[sender][recipient].Content().(*SignRound2Message1)
 	if recipient != r2msg1.UnmarshalRecipient() {
-		errChs <- round.WrapError(fmt.Errorf("improper message [%d][%d]", sender, recipient))
+		errChs <- round.WrapError(errors.New("Could not UnmarshalRecipient"), Psender)
 		return
 	}
 	round.temp.bigD[sender][recipient] = r2msg1.UnmarshalBigD()
@@ -113,7 +112,7 @@ func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss
 	r2msg2 := round.temp.signRound2Message2s[sender].Content().(*SignRound2Message2)
 	pointGamma, err := r2msg2.UnmarshalGamma(ec)
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("could not parse Gamma [%d][%d]", sender, verifier))
+		errChs <- round.WrapError(errors.New("could not UnmarshalGamma"), Psender)
 		return
 	}
 	round.temp.pointGamma[sender] = pointGamma
@@ -122,7 +121,7 @@ func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss
 	if verifier != recipient {
 		psiHat, err := r2msg1.UnmarshalPsiHat(ec)
 		if err != nil {
-			errChs <- round.WrapError(fmt.Errorf("could not parse proof psiHat [%d][%d]", sender, recipient))
+			errChs <- round.WrapError(errors.New("UnmarshalPsiHat"), Psender)
 			return
 		}
 		ok := accmta.AliceVerifyG(
@@ -137,13 +136,13 @@ func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss
 			rpVerifier,
 		)
 		if !ok {
-			errChs <- round.WrapError(fmt.Errorf("proof psiHat failed to verify [%d][%d][%d]", sender, recipient, verifier))
+			errChs <- round.WrapError(errors.New("bad proof"), Psender)
 			return
 		}
 
 		psi, err := r2msg1.UnmarshalPsi(ec)
 		if err != nil {
-			errChs <- round.WrapError(fmt.Errorf("could not parse proof psi [%d][%d]", sender, recipient))
+			errChs <- round.WrapError(errors.New("could not UnmarshalPsi"), Psender)
 			return
 		}
 		ok = accmta.AliceVerifyG(
@@ -158,7 +157,7 @@ func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss
 			rpVerifier,
 		)
 		if !ok {
-			errChs <- round.WrapError(fmt.Errorf("proof psi failed to verify [%d][%d][%d]", sender, recipient, verifier))
+			errChs <- round.WrapError(errors.New("bad proof"), Psender)
 			return
 		}
 	}
@@ -166,7 +165,7 @@ func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss
 	// verify for all
 	psiPrime, err := r2msg2.UnmarshalPsiPrime(ec)
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("could not parse proof psiPrime [%d][%d]", sender, recipient))
+		errChs <- round.WrapError(errors.New("could not UnmarshalPsiPrime"), Psender)
 		return
 	}
 	statement := &zkproofs.LogStarStatement{
@@ -177,7 +176,7 @@ func (round *round3) VerifyRound2Message(sender, recipient int, errChs chan *tss
 	}
 	ok := psiPrime[verifier].Verify(statement, rpVerifier)
 	if !ok {
-		errChs <- round.WrapError(fmt.Errorf("proof psiPrime failed to verify [%d][%d]", sender, verifier))
+		errChs <- round.WrapError(errors.New("bad proof"), Psender)
 		return
 	}
 }
@@ -187,17 +186,18 @@ func (round *round3) AliceEndW(sender int, wg *sync.WaitGroup, errChs chan *tss.
 	i := round.PartyID().Index
 	rp := round.key.GetRingPedersen(i)
 	ec := round.Params().EC()
+	Psender := round.Parties().IDs()[sender]
 
 	r2msg1 := round.temp.signRound2Message1s[sender][i].Content().(*SignRound2Message1)
 	if i != r2msg1.UnmarshalRecipient() {
-		errChs <- round.WrapError(fmt.Errorf("improper message [%d][%d]", sender, i))
+		errChs <- round.WrapError(errors.New("could not parse message"), Psender)
 		return
 	}
 	round.temp.bigDHat[sender][i] = r2msg1.UnmarshalBigDHat()
 	round.temp.bigFHat[sender][i] = r2msg1.UnmarshalBigFHat()
 	psiHat, err := r2msg1.UnmarshalPsiHat(ec)
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("could not parse proof psiHat [%d][%d]", sender, i))
+		errChs <- round.WrapError(errors.New("could not UnmarshalPsiHat"), Psender)
 		return
 	}
 
@@ -213,8 +213,7 @@ func (round *round3) AliceEndW(sender int, wg *sync.WaitGroup, errChs chan *tss.
 		rp,
 	)
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("AliceEndW failed to verify [%d][%d]", sender, i))
-		round.temp.alpha[sender] = big.NewInt(1)
+		errChs <- round.WrapError(errors.New("Could not compute AliceEndW"), Psender)
 		return
 	}
 	round.temp.alphaHat[sender] = alphaHat
@@ -225,23 +224,24 @@ func (round *round3) AliceEndGamma(sender int, wg *sync.WaitGroup, errChs chan *
 	i := round.PartyID().Index
 	rp := round.key.GetRingPedersen(i)
 	ec := round.Params().EC()
+	Psender := round.Parties().IDs()[sender]
 
 	r2msg1 := round.temp.signRound2Message1s[sender][i].Content().(*SignRound2Message1)
 	if i != r2msg1.UnmarshalRecipient() {
-		errChs <- round.WrapError(fmt.Errorf("improper message [%d][%d]", sender, i))
+		errChs <- round.WrapError(errors.New("could not parse signRound2Message1s"), Psender)
 		return
 	}
 	round.temp.bigD[sender][i] = r2msg1.UnmarshalBigD()
 	round.temp.bigF[sender][i] = r2msg1.UnmarshalBigF()
 	psi, err := r2msg1.UnmarshalPsi(ec)
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("could not parse proof psi [%d][%d]", sender, i))
+		errChs <- round.WrapError(errors.New("could not UnmarshalPsi"), Psender)
 		return
 	}
 	r2msg2 := round.temp.signRound2Message2s[sender].Content().(*SignRound2Message2)
 	pointGamma, err := r2msg2.UnmarshalGamma(ec)
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("could not parse Gamma [%d]", sender))
+		errChs <- round.WrapError(errors.New("could not UnmarshalGamma"), Psender)
 		return
 	}
 	round.temp.pointGamma[sender] = pointGamma
@@ -258,8 +258,7 @@ func (round *round3) AliceEndGamma(sender int, wg *sync.WaitGroup, errChs chan *
 		rp,
 	)
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("AliceEndGamma failed to verify [%d][%d]", sender, i))
-		round.temp.alpha[sender] = big.NewInt(1)
+		errChs <- round.WrapError(errors.New("Could not compute response AliceEndGamma"), Psender)
 		return
 	}
 	round.temp.alpha[sender] = alphaIj
@@ -286,7 +285,7 @@ func (round *round3) ComputeDelta() {
 		if j == round.PartyID().Index {
 			continue
 		}
-		temp := modQ.Add(round.temp.alpha[j], round.temp.beta[i][j])
+		temp := modQ.Add(round.temp.alpha[j], round.temp.beta[j])
 		delta = modQ.Add(delta, temp)
 	}
 	round.temp.delta[i] = delta
@@ -297,13 +296,13 @@ func (round *round3) ComputeChi() {
 	modQ := common.ModInt(round.Params().EC().Params().N)
 	chi := modQ.Mul(round.temp.k, round.temp.w)
 	for j := range round.Parties().IDs() {
-		if j == round.PartyID().Index {
+		if j == i {
 			continue
 		}
-		temp := modQ.Add(round.temp.alphaHat[j], round.temp.betaHat[i][j])
+		temp := modQ.Add(round.temp.alphaHat[j], round.temp.betaHat[j])
 		chi = modQ.Add(chi, temp)
 	}
-	round.temp.chi[i] = chi
+	round.temp.chi = chi
 }
 
 func (round *round3) ComputePsiPrimePrime() ([]*zkproofs.LogStarProof, *tss.Error) {
@@ -311,12 +310,13 @@ func (round *round3) ComputePsiPrimePrime() ([]*zkproofs.LogStarProof, *tss.Erro
 	round.ComputeChi()
 	round.ComputeGamma()
 	i := round.PartyID().Index
+	Pi := round.Parties().IDs()[i]
 	ec := round.Params().EC()
 
 	ski := round.key.PaillierSK
 	_, rho, errd := ski.DecryptFull(round.temp.bigK[i])
 	if errd != nil {
-		return nil, round.WrapError(fmt.Errorf("could not decrypt D"))
+		return nil, round.WrapError(errors.New("could not decrypt bigK"), Pi)
 	}
 
 	statement := &zkproofs.LogStarStatement{
@@ -350,15 +350,16 @@ func (round *round3) ComputePsiPrimePrime() ([]*zkproofs.LogStarProof, *tss.Erro
 
 func (round *round3) ComputeHProof() (*zkproofs.MulProof, *tss.Error) {
 	i := round.PartyID().Index
+	Pi := round.Parties().IDs()[i]
 	pki := round.key.PaillierPKs[i]
 	bigH, rho, err := pki.HomoMultAndReturnRandomness(round.temp.gamma, round.temp.bigK[i])
 	if err != nil {
-		return nil, round.WrapError(fmt.Errorf("trouble computing bigH"))
+		return nil, round.WrapError(errors.New("trouble computing bigH"), Pi)
 	}
 	round.temp.bigH = bigH
 	x, rhox, err := round.key.PaillierSK.DecryptFull(round.temp.bigG[i])
 	if err != nil || x.Cmp(round.temp.gamma) != 0 {
-		return nil, round.WrapError(fmt.Errorf("Bad G[i]"))
+		return nil, round.WrapError(errors.New("Bad G[i]"), Pi)
 	}
 
 	witness := &zkproofs.MulWitness{
@@ -373,9 +374,6 @@ func (round *round3) ComputeHProof() (*zkproofs.MulProof, *tss.Error) {
 		C: round.temp.bigH,
 	}
 	Hproof := zkproofs.NewMulProof(witness, statement)
-	if !Hproof.Verify(statement) {
-		return nil, round.WrapError(fmt.Errorf("could not make Hproof"))
-	}
 	return Hproof, nil
 }
 
@@ -390,11 +388,11 @@ func (round *round3) ComputeXDelta() (*big.Int, error) {
 		}
 		XDelta, err = ski.PublicKey.HomoAdd(XDelta, round.temp.bigD[j][i])
 		if err != nil {
-			return nil, fmt.Errorf("could not compute XDelta")
+			return nil, errors.New("could not compute XDelta")
 		}
 		XDelta, err = ski.PublicKey.HomoAdd(XDelta, round.temp.bigF[i][j])
 		if err != nil {
-			return nil, fmt.Errorf("could not compute XDelta")
+			return nil, errors.New("could not compute XDelta")
 		}
 	}
 	return XDelta, nil
@@ -406,30 +404,18 @@ func (round *round3) ComputeDeltaProof() ([]*zkproofs.DecProof, *tss.Error) {
 		return nil, round.WrapError(err)
 	}
 	i := round.PartyID().Index
+	Pi := round.Parties().IDs()[i]
 	ski := round.key.PaillierSK
 	q := round.Params().EC().Params().N
 
 	d, rho, err := ski.DecryptFull(XDelta)
 	if err != nil {
-		return nil, round.WrapError(fmt.Errorf("could not decrypt XDelta"))
-	}
-	if d.Cmp(ski.PublicKey.N) >= 0 {
-		return nil, round.WrapError(fmt.Errorf("d.Cmp(N) >= 0"))
-	}
-	if rho.Cmp(ski.PublicKey.N) >= 0 {
-		return nil, round.WrapError(fmt.Errorf("rho.Cmp(N) >= 0"))
-	}
-	newC, err := ski.PublicKey.EncryptWithRandomness(d, rho)
-	if err != nil {
-		return nil, round.WrapError(err)
-	}
-	if newC.Cmp(XDelta) != 0 {
-		return nil, round.WrapError(fmt.Errorf("badly formed XDelta rho"))
+		return nil, round.WrapError(errors.New("could not decrypt XDelta"), Pi)
 	}
 
 	modQ := common.ModInt(q)
 	if !modQ.IsCongruent(d, round.temp.delta[i]) {
-		return nil, round.WrapError(fmt.Errorf("badly formed XDelta"))
+		return nil, round.WrapError(errors.New("badly formed XDelta"), Pi)
 	}
 
 	statement := &zkproofs.DecStatement{
@@ -437,7 +423,7 @@ func (round *round3) ComputeDeltaProof() ([]*zkproofs.DecProof, *tss.Error) {
 		Ell: zkproofs.GetEll(round.Params().EC()),
 		N0:  ski.PublicKey.N,
 		C:   XDelta,
-		X:   modQ.Mod(d), //round.temp.delta[i],
+		X:   round.temp.delta[i],
 	}
 	witness := &zkproofs.DecWitness{
 		Y:   d,

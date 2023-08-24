@@ -50,21 +50,20 @@ type (
 	localTempData struct {
 		localMessageStore
 		m,
-		// round 1 - all data except bigWs removed in round 5
 		keyDerivationDelta,
-		w,
+		w *big.Int
+		bigWs []*crypto.ECPoint
+
+		// round 1
 		k,
-		gamma,
-		rho,
-		nu *big.Int
+		gamma *big.Int
 		bigG,
 		bigK []*big.Int // [sender] -> self
-		bigWs []*crypto.ECPoint // [sender] -> self
 
 		// round 2
 		pointGamma []*crypto.ECPoint // [sender] -> self
 		beta,
-		betaHat,
+		betaHat []*big.Int // self -> [receiver]
 		bigF,
 		bigFHat,
 		bigD,
@@ -72,59 +71,21 @@ type (
 
 		// round 3
 		delta,
-		chi, // likely just one chi not array
 		alpha,
-		alphaHat,
-		XDelta []*big.Int // [sender] -> self
+		alphaHat []*big.Int // [sender] -> self
 		Gamma    *crypto.ECPoint
-		bigDelta []*crypto.ECPoint
-		bigH     *big.Int
+		bigDelta []*crypto.ECPoint // [sender] -> self
+		bigH,
+		chi *big.Int
 
 		// round 4
-		finalDelta,
-		finalDeltaInv,
 		rx,
 		ry *big.Int
-		bigR *crypto.ECPoint
 
 		// round 5
 		sigma *big.Int
-
-		// finalization
-		bigSigma []*big.Int
 	}
 )
-
-func (temp *localTempData) CleanUpPreSigningData() {
-	// round 1
-	temp.w = nil
-	temp.k = nil
-	temp.gamma = nil
-	temp.rho = nil
-	temp.nu = nil
-	temp.bigG = nil
-	temp.bigK = nil
-	//		leave bigWs
-	/*
-		// round 2
-		temp.beta = nil
-		temp.nu = nil
-		temp.cAlpha = nil
-		temp.cBeta = nil
-		temp.cBetaPrm = nil
-		temp.cMu = nil
-		temp.cNu = nil
-		temp.cNuPrm = nil
-
-		// round 3
-		temp.delta = nil
-		temp.D = nil
-		temp.alpha = nil
-		temp.mu = nil
-
-		// round 4
-		temp.finalDeltaInv = nil*/
-}
 
 func NewLocalParty(
 	msg *big.Int,
@@ -173,8 +134,8 @@ func NewLocalPartyWithKDD(
 
 	// round 2
 	p.temp.pointGamma = make([]*crypto.ECPoint, partyCount)
-	p.temp.beta = Make2DSlice[*big.Int](partyCount)
-	p.temp.betaHat = Make2DSlice[*big.Int](partyCount)
+	p.temp.beta = make([]*big.Int, partyCount)
+	p.temp.betaHat = make([]*big.Int, partyCount)
 	p.temp.bigF = Make2DSlice[*big.Int](partyCount)
 	p.temp.bigFHat = Make2DSlice[*big.Int](partyCount)
 	p.temp.bigD = Make2DSlice[*big.Int](partyCount)
@@ -184,12 +145,7 @@ func NewLocalPartyWithKDD(
 	p.temp.alpha = make([]*big.Int, partyCount)
 	p.temp.alphaHat = make([]*big.Int, partyCount)
 	p.temp.delta = make([]*big.Int, partyCount)
-	p.temp.chi = make([]*big.Int, partyCount)
 	p.temp.bigDelta = make([]*crypto.ECPoint, partyCount)
-	p.temp.XDelta = make([]*big.Int, partyCount)
-
-	// finalization
-	p.temp.bigSigma = make([]*big.Int, partyCount)
 
 	return p
 }

@@ -52,8 +52,6 @@ func SetupParties(t *testing.T) (
 	outCh = make(chan tss.Message, len(signPIDs)*len(signPIDs)*3)
 	endCh := make(chan common.SignatureData, len(signPIDs))
 
-	//	updater := test.SharedPartyUpdater
-
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		Pparams := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), testThreshold)
@@ -62,24 +60,6 @@ func SetupParties(t *testing.T) (
 		parties = append(parties, P)
 	}
 	return params, parties, outCh, keys, signPIDs, p2pCtx
-}
-
-func GetParsedMessage(t *testing.T, message tss.Message, expectedType string) tss.ParsedMessage {
-	wireBytes, routing, err := message.WireBytes()
-	assert.NoError(t, err)
-	mType := message.Type()
-	assert.Equal(t, expectedType, mType)
-	from := routing.From
-	isBroadcast := message.IsBroadcast()
-	parsedMessage, err := tss.ParseWireMessage(wireBytes, from, isBroadcast)
-	assert.NoError(t, err)
-	assert.True(t, parsedMessage.ValidateBasic())
-	return parsedMessage
-}
-
-func IsMessageType(msg tss.Message, expectedType string) bool {
-	mType := msg.Type()
-	return expectedType == mType
 }
 
 func AssertNoErrors(t *testing.T, errChs chan *tss.Error) {
@@ -148,8 +128,6 @@ func RunRound[InRound tss.Round, OutRound tss.Round](
 	totalMessages int,
 	outCh chan tss.Message,
 ) []OutRound {
-	t.Logf("Updating")
-
 	outrounds := make([]OutRound, len(parties))
 	for j, round := range inrounds {
 		ok, tssErr := round.Update()
@@ -157,8 +135,6 @@ func RunRound[InRound tss.Round, OutRound tss.Round](
 		AssertNoTssError(t, tssErr)
 		outrounds[j] = round.NextRound().(OutRound)
 	}
-	t.Logf("Running round")
-
 	wg := sync.WaitGroup{}
 	for j, round := range outrounds {
 		wg.Add(1)
@@ -169,7 +145,6 @@ func RunRound[InRound tss.Round, OutRound tss.Round](
 		}(j, round)
 	}
 	wg.Wait()
-	t.Logf("Delivering")
 	DeliverMessages(t, totalMessages, parties, outCh)
 	return outrounds
 }

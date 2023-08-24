@@ -8,7 +8,6 @@ package cggplus
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
@@ -64,14 +63,11 @@ var (
 
 func (round *base) WrapErrorChs(id *tss.PartyID, errChs chan *tss.Error, msg string) *tss.Error {
 	culprits := make([]*tss.PartyID, 0, len(round.Parties().IDs()))
-	length := len(errChs)
-	allMsgs := ""
 	for err := range errChs {
-		allMsgs = fmt.Sprintf("%s %s", allMsgs, err.Error())
 		culprits = append(culprits, err.Culprits()...)
 	}
-	if length > 0 {
-		return round.WrapError(errors.New(fmt.Sprintf("round [%d], party [%d], %s,%s", round.number, id.Index, msg, allMsgs)), culprits...)
+	if len(culprits) > 0 {
+		return round.WrapError(errors.New(msg), culprits...)
 	}
 	return nil
 }

@@ -4,7 +4,6 @@ package cggplus
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -40,6 +39,7 @@ func (round *round4) Start() *tss.Error {
 	r4msg := NewSignRound4Message(round.PartyID())
 	round.temp.signRound4Messages[i] = r4msg
 	round.out <- r4msg
+	round.CleanUpPreSigningData()
 	return nil
 }
 
@@ -72,20 +72,21 @@ func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 		wg.Add(1)
 		go func(sender int) {
 			defer wg.Done()
+			Psender := round.Parties().IDs()[sender]
 			r3msg := round.temp.signRound3Messages[sender].Content().(*SignRound3Message)
 			psiPrimePrime, err := r3msg.UnmarshalPsiPrimePrime(tss.EC())
 			if err != nil {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to parse psiPrimePrime from party %d.", sender)))
+				errChs <- round.WrapError(errors.New("failed to parse psiPrimePrime from party"), Psender)
 				return
 			}
 			round.temp.delta[sender] = r3msg.UnmarshalDelta()
 			if round.temp.delta[sender] == nil {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent nil delta.", sender)))
+				errChs <- round.WrapError(errors.New("sender sent nil delta"), Psender)
 				return
 			}
 			bigDelta, err := r3msg.UnmarshalBigDelta(round.Params().EC())
 			if err != nil {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent bad bigDelta.", sender)))
+				errChs <- round.WrapError(errors.New("sender sent bad bigDelta"), Psender)
 				return
 			}
 			round.temp.bigDelta[sender] = bigDelta
@@ -98,18 +99,18 @@ func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 				G:   round.temp.Gamma,
 			}
 			if !psiPrimePrime[i].Verify(statement, rp) {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify proof from party %d.", sender)))
+				errChs <- round.WrapError(errors.New("failed to verify proof from party"), Psender)
 				return
 			}
 
 			bigH := r3msg.UnmarshalBigH()
 			if bigH == nil {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent nil bigH.", sender)))
+				errChs <- round.WrapError(errors.New("sender sent nil bigH"), Psender)
 				return
 			}
 			HProof, err := r3msg.UnmarshalHProof()
 			if err != nil {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent bad HProof.", sender)))
+				errChs <- round.WrapError(errors.New("could not UnmarshalHProof"), Psender)
 				return
 			}
 			statementH := &zkproofs.MulStatement{
@@ -119,18 +120,18 @@ func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 				C: bigH,
 			}
 			if !HProof.Verify(statementH) {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify HProof from party %d.", sender)))
+				errChs <- round.WrapError(errors.New("failed to verify HProof"), Psender)
 				return
 			}
 
 			XDelta, err := round.ComputeXDelta(sender, bigH)
 			if err != nil {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to compute XDelta for party %d.", sender)))
+				errChs <- round.WrapError(errors.New("failed to compute XDelta"), Psender)
 				return
 			}
 			deltaProof, err := r3msg.UnmarshalDeltaProof(round.Params().EC())
 			if err != nil {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("sender %d sent bad deltaProof.", sender)))
+				errChs <- round.WrapError(errors.New("could not UnmarshalDeltaProof"), Psender)
 				return
 			}
 			statementDelta := &zkproofs.DecStatement{
@@ -141,14 +142,13 @@ func (round *round4) VerifyRound3Messages(errChs chan *tss.Error) {
 				X:   round.temp.delta[sender],
 			}
 			if !deltaProof[i].Verify(statementDelta, rp) {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify XDeltaProof from party %d.", sender)))
+				errChs <- round.WrapError(errors.New("failed to verify XDeltaProof"), Psender)
 				return
 			}
 
 		}(j)
 	}
 	wg.Wait()
-
 }
 
 func (round *round4) ComputeValues() *tss.Error {
@@ -163,21 +163,38 @@ func (round *round4) ComputeValues() *tss.Error {
 			sumBigDelta, err = sumBigDelta.Add(round.temp.bigDelta[j])
 		}
 		if err != nil {
-			return round.WrapError(errors.New(fmt.Sprintf("Unexpected error computing delta.")))
+			return round.WrapError(errors.New("Unexpected error computing delta."))
 		}
 		delta = modQ.Add(delta, deltaJ)
 	}
 	expectedSum := crypto.ScalarBaseMult(round.Params().EC(), delta)
 	if !expectedSum.Equals(sumBigDelta) {
-		return round.WrapError(errors.New(fmt.Sprintf("Unexpected error computing delta.")))
+		return round.WrapError(errors.New("Unexpected error computing delta."))
 	}
 
-	round.temp.finalDelta = delta
-	round.temp.finalDeltaInv = modQ.ModInverse(delta)
-	round.temp.bigR = round.temp.Gamma.ScalarMult(round.temp.finalDeltaInv)
-	round.temp.rx = round.temp.bigR.X()
-	round.temp.ry = round.temp.bigR.Y()
+	finalDeltaInv := modQ.ModInverse(delta)
+	bigR := round.temp.Gamma.ScalarMult(finalDeltaInv)
+	round.temp.rx = bigR.X()
+	round.temp.ry = bigR.Y()
 	return nil
+}
+
+func (round *round4) CleanUpPreSigningData() {
+	// round 1
+	round.temp.gamma = nil
+	round.temp.bigG = nil
+
+	// round 2
+	round.temp.pointGamma = nil // [sender] -> self
+	round.temp.beta = nil
+	round.temp.betaHat = nil
+	round.temp.bigF = nil
+	round.temp.bigD = nil
+
+	// round 3
+	round.temp.delta = nil
+	round.temp.alpha = nil
+	round.temp.alphaHat = nil
 }
 
 func (round *round4) Update() (bool, *tss.Error) {

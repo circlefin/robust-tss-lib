@@ -5,7 +5,6 @@ package cggplus
 import (
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -25,6 +24,7 @@ func (round *finalization) Start() *tss.Error {
 	partyCount := len(round.Parties().IDs())
 	errChs := make(chan *tss.Error, partyCount*partyCount)
 	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		round.VerifyRound5Messages(errChs)
@@ -72,11 +72,11 @@ func (round *finalization) Start() *tss.Error {
 	}
 	ok := ecdsa.Verify(&pk, round.temp.m.Bytes(), round.temp.rx, sumS)
 	if !ok {
-		return round.WrapError(fmt.Errorf("signature verification failed"))
+		return round.WrapError(errors.New("signature verification failed"))
 	}
 
 	round.end <- *round.data
-
+	round.CleanUpPostSigningData()
 	return nil
 }
 
@@ -95,9 +95,10 @@ func (round *finalization) GetSumS() *big.Int {
 	return sumS
 }
 
-func (round *round5) ComputeBigSigma(i int, bigHHat *big.Int) *tss.Error {
+func (round *finalization) ComputeBigSigma(i int, bigHHat *big.Int, bigSigma []*big.Int) *tss.Error {
 	pki := round.key.PaillierPKs[i]
 	prod := bigHHat
+	Pi := round.Parties().IDs()[i]
 	var err error
 	for j := range round.Parties().IDs() {
 		if j == i {
@@ -105,29 +106,26 @@ func (round *round5) ComputeBigSigma(i int, bigHHat *big.Int) *tss.Error {
 		}
 		temp, err := round.key.PaillierPKs[i].HomoAdd(round.temp.bigDHat[j][i], round.temp.bigFHat[i][j])
 		if err != nil {
-			return round.WrapError(fmt.Errorf("could not compute bigSigma a"))
+			return round.WrapError(errors.New("could not compute bigSigma"), Pi)
 		}
 		prod, err = round.key.PaillierPKs[i].HomoAdd(prod, temp)
 		if err != nil {
-			return round.WrapError(fmt.Errorf("could not compute bigSigma b"))
+			return round.WrapError(errors.New("could not compute bigSigma"), Pi)
 		}
 	}
 	prod, err = pki.HomoMult(round.temp.rx, prod)
 	if err != nil {
-		return round.WrapError(fmt.Errorf("could not compute bigSigma c"))
-	}
-	if round.temp.bigK == nil {
-		return round.WrapError(fmt.Errorf("something wrong with bigK[%d]", i))
+		return round.WrapError(errors.New("could not compute bigSigma"), Pi)
 	}
 	prodPrime, err := pki.HomoMult(round.temp.m, round.temp.bigK[i])
 	if err != nil {
-		return round.WrapError(fmt.Errorf("could not compute bigSigma d"))
+		return round.WrapError(errors.New("could not compute bigSigma"), Pi)
 	}
-	bigSigma, err := pki.HomoAdd(prod, prodPrime)
+	bs, err := pki.HomoAdd(prod, prodPrime)
 	if err != nil {
-		return round.WrapError(fmt.Errorf("could not compute bigSigma e"))
+		return round.WrapError(errors.New("could not compute bigSigma"), Pi)
 	}
-	round.temp.bigSigma[i] = bigSigma
+	bigSigma[i] = bs
 	return nil
 }
 
@@ -135,6 +133,7 @@ func (round *finalization) VerifyRound5Messages(errChs chan *tss.Error) {
 	i := round.PartyID().Index
 	rp := round.key.GetRingPedersen(i)
 	wg := sync.WaitGroup{}
+	bigSigma := make([]*big.Int, len(round.Parties().IDs()))
 	for j, msg := range round.temp.signRound5Messages {
 		r5msg := msg.Content().(*SignRound5Message)
 		if j == i {
@@ -143,8 +142,9 @@ func (round *finalization) VerifyRound5Messages(errChs chan *tss.Error) {
 		wg.Add(1)
 		go func(j int, r5msg *SignRound5Message) {
 			defer wg.Done()
+			Pj := round.Parties().IDs()[j]
 			bigHHat := r5msg.UnmarshalBigHHat()
-			terr := round.ComputeBigSigma(j, bigHHat)
+			terr := round.ComputeBigSigma(j, bigHHat, bigSigma)
 			if terr != nil {
 				errChs <- terr
 				return
@@ -160,7 +160,7 @@ func (round *finalization) VerifyRound5Messages(errChs chan *tss.Error) {
 			}
 			proof, err := r5msg.UnmarshalBigHHatProof(round.Params().EC())
 			if err != nil || !proof[i].Verify(statementBigHHat, rp) {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("bad proof from party %d.", j)))
+				errChs <- round.WrapError(errors.New("bad proof"), Pj)
 				return
 			}
 
@@ -170,21 +170,28 @@ func (round *finalization) VerifyRound5Messages(errChs chan *tss.Error) {
 				Q:   ec.Params().N,
 				Ell: zkproofs.GetEll(ec),
 				N0:  pkj.N,
-				C:   round.temp.bigSigma[j],
+				C:   bigSigma[j],
 				X:   sigma,
 			}
 			proofSigma, err := r5msg.UnmarshalSigmaProof(ec)
 			if err != nil {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to parse proof from party %d.", j)))
+				errChs <- round.WrapError(errors.New("failed to parse proof"), Pj)
 				return
 			}
 			if !proofSigma[i].Verify(statement, rp) {
-				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify proof from party %d.", j)))
+				errChs <- round.WrapError(errors.New("failed to verify proof"), Pj)
 				return
 			}
 		}(j, r5msg)
 	}
 	wg.Wait()
+}
+
+func (round *finalization) CleanUpPostSigningData() {
+	round.temp.bigK = nil
+	round.temp.bigFHat = nil
+	round.temp.bigDHat = nil
+	round.temp.sigma = nil
 }
 
 func (round *finalization) CanAccept(msg tss.ParsedMessage) bool {

@@ -4,7 +4,6 @@ package cggplus
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/bnb-chain/tss-lib/crypto"
@@ -45,7 +44,7 @@ func (round *round2) Start() *tss.Error {
 	}
 	wg.Wait()
 	close(errChs)
-	err := round.WrapErrorChs(round.PartyID(), errChs, "Failed to verify round 1 messages")
+	err := round.WrapErrorChs(round.PartyID(), errChs, "Failed to process round 1 messages.")
 	if err != nil {
 		return err
 	}
@@ -64,12 +63,14 @@ func (round *round2) Start() *tss.Error {
 			psi[j],
 			psiHat[j],
 		)
+		round.temp.signRound2Message1s[i][j] = r2msg1
 		round.out <- r2msg1
 	}
 	r2msg2 := NewSignRound2Message2(
 		round.PartyID(),
 		round.temp.pointGamma[i],
 		psiPrime)
+	round.temp.signRound2Message2s[i] = r2msg2
 	round.out <- r2msg2
 
 	return nil
@@ -98,7 +99,8 @@ func (round *round2) BobRespondsW(j int, Pj *tss.PartyID, proofs [][]*zkproofs.A
 	r1msg := round.temp.signRound1Messages[j].Content().(*SignRound1Message)
 	psiAlice, err := r1msg.UnmarshalPsi()
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("error parsing r1msg[%d]", j), Pj)
+		errChs <- round.WrapError(errors.New("UnmarshalPsi failed"), Pj)
+		return
 	}
 
 	ringPedersenBobI := round.key.GetRingPedersen(i)
@@ -115,10 +117,11 @@ func (round *round2) BobRespondsW(j int, Pj *tss.PartyID, proofs [][]*zkproofs.A
 		ringPedersenBobI,
 	)
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("bobrespondsw"))
+		errChs <- round.WrapError(errors.New("BobResponds(w) failed"), Pj)
+		return
 	}
 
-	round.temp.betaHat[i][j] = betaHat
+	round.temp.betaHat[j] = betaHat
 	round.temp.bigDHat[i][j] = bigDHat
 	round.temp.bigFHat[i][j] = bigFHat
 	proofs[j] = pf
@@ -131,7 +134,8 @@ func (round *round2) BobRespondsGamma(j int, Pj *tss.PartyID, proofs [][]*zkproo
 	r1msg := round.temp.signRound1Messages[j].Content().(*SignRound1Message)
 	psiAlice, err := r1msg.UnmarshalPsi()
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("error parsing r1msg[%d]", j), Pj)
+		errChs <- round.WrapError(errors.New("UnmarshalPsi failed"), Pj)
+		return
 	}
 
 	ringPedersenBobI := round.key.GetRingPedersen(i)
@@ -148,11 +152,11 @@ func (round *round2) BobRespondsGamma(j int, Pj *tss.PartyID, proofs [][]*zkproo
 		ringPedersenBobI,
 	)
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("bobrespondsGamma"))
-
+		errChs <- round.WrapError(errors.New("BobResponds(gamma) failed"), Pj)
+		return
 	}
 
-	round.temp.beta[i][j] = beta
+	round.temp.beta[j] = beta
 	round.temp.bigD[i][j] = bigD
 	round.temp.bigF[i][j] = bigF
 	proofs[j] = pf
@@ -167,7 +171,8 @@ func (round *round2) ComputeProofPsiPrime(j int, Pj *tss.PartyID, proofs []*zkpr
 
 	_, rho, err := round.key.PaillierSK.DecryptFull(round.temp.bigG[i])
 	if err != nil {
-		errChs <- round.WrapError(fmt.Errorf("error making parsing bigG[%d]", i), Pj)
+		errChs <- round.WrapError(errors.New("Error decrypting bigG"), Pj)
+		return
 	}
 	witness := &zkproofs.LogStarWitness{
 		X:   round.temp.gamma,

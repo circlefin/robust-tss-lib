@@ -8,16 +8,10 @@ import (
 	"math/big"
 
 	"github.com/bnb-chain/tss-lib/common"
-	//	"github.com/bnb-chain/tss-lib/crypto"
 	"github.com/bnb-chain/tss-lib/crypto/accmta"
-	//	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
 	"github.com/bnb-chain/tss-lib/ecdsa/signing"
 	"github.com/bnb-chain/tss-lib/tss"
-)
-
-var (
-	zero = big.NewInt(0)
 )
 
 func newRound1(params *tss.Parameters, key *keygen.LocalPartySaveData, data *common.SignatureData, temp *localTempData, out chan<- tss.Message, end chan<- common.SignatureData) tss.Round {
@@ -40,15 +34,15 @@ func (round *round1) Start() *tss.Error {
 	q := round.Params().EC().Params().N
 
 	gamma := common.GetRandomPositiveInt(q)
-	bigG, rho, err := paillierPK.EncryptAndReturnRandomness(gamma)
+	bigG, err := paillierPK.Encrypt(gamma)
 	if err != nil {
-		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
+		return round.WrapError(errors.New("failed to init round1."))
 	}
 
 	k := common.GetRandomPositiveInt(q)
 	bigK, nu, err := paillierPK.EncryptAndReturnRandomness(k)
 	if err != nil {
-		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
+		return round.WrapError(errors.New("failed to init round1."))
 	}
 
 	rpVs := round.key.GetAllRingPedersen()
@@ -60,16 +54,14 @@ func (round *round1) Start() *tss.Error {
 		rpVs,
 	)
 	if err != nil {
-		return round.WrapError(fmt.Errorf("failed to init round1: %v", err))
+		return round.WrapError(errors.New("failed to init round1."))
 	}
 
 	// save data for later
 	round.temp.k = k
 	round.temp.gamma = gamma
 	round.temp.bigG[i] = bigG
-	round.temp.rho = rho
 	round.temp.bigK[i] = bigK
-	round.temp.nu = nu
 
 	// broadcast
 	r1msg := NewSignRound1Message(round.PartyID(), bigK, bigG, psiArray)
