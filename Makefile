@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0 AND MIT
 
 
-MODULE = github.com/bnb-chain/tss-lib
+MODULE = github.com/bnb-chain/tss-lib/v2
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')
 
 all: protob test
