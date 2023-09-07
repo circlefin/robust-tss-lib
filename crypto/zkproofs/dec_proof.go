@@ -99,7 +99,6 @@ func NewDecProof(wit *DecWitness, stmt *DecStatement, rp *RingPedersenParams) *D
 }
 
 // dec in CGG21 Appendix C6 Figure 30.
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 	if proof == nil {
 		return false
@@ -111,6 +110,11 @@ func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
+
+    // otherwise first verification equation trivially true
+    if IsZero(proof.W) || IsZero(proof.A) {
+        return false
+    }
 
 	// check (1+N0)^z1 * w^N0 mod N02 == A * C^e mod N02
 	pkN0 := &paillier.PublicKey{N: stmt.N0}

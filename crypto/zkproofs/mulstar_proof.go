@@ -50,7 +50,6 @@ type MulStarStatement struct {
 }
 
 // mul* in CGG21 Appendix C.6 Figure 31
-// todo: check proof for typos - especially modular reduction for some values.
 func NewMulStarProof(wit *MulStarWitness, stmt *MulStarStatement, rp *RingPedersenParams) *MulStarProof {
 	// derive some parameters
 	ec := stmt.X.Curve()
@@ -100,7 +99,6 @@ func NewMulStarProof(wit *MulStarWitness, stmt *MulStarStatement, rp *RingPeders
 
 // mul in CGG21 in CGG21 Appendix C.6 Figure 29
 // The Verifier checks the proof against the statement (N, X, Y, C)
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *MulStarProof) Verify(stmt *MulStarStatement, rp *RingPedersenParams) bool {
 	if proof == nil {
 		return false
@@ -116,6 +114,11 @@ func (proof *MulStarProof) Verify(stmt *MulStarStatement, rp *RingPedersenParams
 
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
+
+    // otherwise first verification equation trivially true
+    if IsZero(proof.W) || IsZero(proof.A) {
+        return false
+    }
 
 	// Check C^z1 w^N0 mod N02 == A * D^e mod N02
 	left1 := PseudoPaillierEncrypt(stmt.C, proof.Z1, proof.W, stmt.N0, N02)

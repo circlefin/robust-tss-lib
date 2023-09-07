@@ -5,7 +5,6 @@ package cggplus
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/crypto/accmta"

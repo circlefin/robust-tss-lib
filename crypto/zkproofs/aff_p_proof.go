@@ -184,7 +184,6 @@ func NewAffPProof(wit *AffPWitness, stmt *AffPStatement, rp *RingPedersenParams)
 }
 
 // aff-p from CGG21 Appendix C.3 Figure 26
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *AffPProof) Verify(stmt *AffPStatement, rp *RingPedersenParams) bool {
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
 	N12 := new(big.Int).Mul(stmt.N1, stmt.N1)
@@ -199,6 +198,11 @@ func (proof *AffPProof) Verify(stmt *AffPStatement, rp *RingPedersenParams) bool
 	// Get challenge
 	e := proof.GetChallenge(stmt, rp)
 
+    // otherwise first verification equation trivially true
+    if IsZero(proof.W) || IsZero(proof.A) {
+        return false
+    }
+
 	// check C^z1 (1+N0)^z2 w^N0 mod N02 == A * D^e mod N02
 	// left1prime := (1+N0)^z1 w^N0 mod N02
 	pkN0 := &paillier.PublicKey{N: stmt.N0}
@@ -209,6 +213,11 @@ func (proof *AffPProof) Verify(stmt *AffPStatement, rp *RingPedersenParams) bool
 		return false
 	}
 
+    // otherwise second verification equation trivially true
+    if IsZero(proof.Wx) || IsZero(proof.Bx) {
+        return false
+    }
+
 	// check (1+N1)^z1 wx^N1 mod N1^2 == Bx * X^e mod N1^2
 	pkN1 := &paillier.PublicKey{N: stmt.N1}
 	left2, err := pkN1.EncryptWithRandomness(proof.Z1, proof.Wx)
@@ -216,6 +225,11 @@ func (proof *AffPProof) Verify(stmt *AffPStatement, rp *RingPedersenParams) bool
 	if err != nil || left2.Cmp(right2) != 0 {
 		return false
 	}
+
+    // otherwise third verification equation trivially true
+    if IsZero(proof.Wy) || IsZero(proof.By) {
+        return false
+    }
 
 	// check (1+N1)^z2 wy^N1 mod N1^2 == By * Y^e mod N1^2
 	left3, err := pkN1.EncryptWithRandomness(proof.Z2, proof.Wy)

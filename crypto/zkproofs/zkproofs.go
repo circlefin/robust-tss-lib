@@ -141,6 +141,13 @@ func Q(ec elliptic.Curve) *big.Int {
 	return ec.Params().N
 }
 
+func IsZero(val *big.Int) bool {
+    if val.Cmp(big.NewInt(0))== 0 {
+        return true
+    }
+    return false
+}
+
 // returns c = gamma^m * rho^N mod N^2
 func PseudoPaillierEncrypt(gamma *big.Int, m *big.Int, rho *big.Int, N *big.Int, N2 *big.Int) *big.Int {
 	// 1. Gm = gamma^m mod N2
