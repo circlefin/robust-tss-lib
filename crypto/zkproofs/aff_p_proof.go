@@ -184,7 +184,6 @@ func NewAffPProof(wit *AffPWitness, stmt *AffPStatement, rp *RingPedersenParams)
 }
 
 // aff-p from CGG21 Appendix C.3 Figure 26
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *AffPProof) Verify(stmt *AffPStatement, rp *RingPedersenParams) bool {
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
 	N12 := new(big.Int).Mul(stmt.N1, stmt.N1)

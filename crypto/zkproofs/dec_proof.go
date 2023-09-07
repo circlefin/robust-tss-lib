@@ -99,7 +99,6 @@ func NewDecProof(wit *DecWitness, stmt *DecStatement, rp *RingPedersenParams) *D
 }
 
 // dec in CGG21 Appendix C6 Figure 30.
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 	if proof == nil {
 		return false

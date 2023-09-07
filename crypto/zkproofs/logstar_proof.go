@@ -108,7 +108,6 @@ func NewLogStarProof(wit *LogStarWitness, stmt *LogStarStatement, rp *RingPeders
 
 // log* from CGG21 Appendix C.2 Figure 25.
 // The Verifier checks the proof against the statement (N0, C, X)
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *LogStarProof) Verify(stmt *LogStarStatement, rp *RingPedersenParams) bool {
 	if proof == nil {
 		return false

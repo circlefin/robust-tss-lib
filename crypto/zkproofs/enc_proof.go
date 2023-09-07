@@ -103,7 +103,6 @@ func NewEncProof(wit *EncWitness, stmt *EncStatement, rp *RingPedersenParams) (*
 
 // enc in CGG21 in CGG21 Section 6.1 Figure 14
 // The Verifier checks the proof against the statement (N0, K)
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *EncProof) Verify(stmt *EncStatement, rp *RingPedersenParams) bool {
 	if proof == nil {
 		return false

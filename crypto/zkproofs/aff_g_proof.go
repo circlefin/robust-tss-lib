@@ -64,7 +64,6 @@ type AffGStatement struct {
 }
 
 // aff-g from CGG21 Section 6.2 Figure 15.
-// todo: check proof for typos - especially modular reduction for some values.
 func NewAffGProof(wit *AffGWitness, stmt *AffGStatement, rp *RingPedersenParams) (*AffGProof, error) {
 	// derive some parameters
 	ec := stmt.X.Curve()
@@ -145,7 +144,6 @@ func NewAffGProof(wit *AffGWitness, stmt *AffGStatement, rp *RingPedersenParams)
 
 // aff-g from CGG21 Section 6.2 Figure 15.
 // The Verifier checks the proof against the statement (N0, C, X)
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *AffGProof) Verify(stmt *AffGStatement, rp *RingPedersenParams) bool {
 	if proof == nil {
 		return false

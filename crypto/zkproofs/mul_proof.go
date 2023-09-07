@@ -42,7 +42,6 @@ type MulStatement struct {
 }
 
 // mul in CGG21 in CGG21 Appendix C.6 Figure 29
-// todo: check proof for typos - especially modular reduction for some values.
 func NewMulProof(wit *MulWitness, stmt *MulStatement) *MulProof {
 	// 1. Prover samples and computes
 	alpha := common.GetRandomPositiveInt(stmt.N)
@@ -81,7 +80,6 @@ func NewMulProof(wit *MulWitness, stmt *MulStatement) *MulProof {
 
 // mul in CGG21 in CGG21 Appendix C.6 Figure 29
 // The Verifier checks the proof against the statement (N, X, Y, C)
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *MulProof) Verify(stmt *MulStatement) bool {
 	if proof == nil {
 		return false

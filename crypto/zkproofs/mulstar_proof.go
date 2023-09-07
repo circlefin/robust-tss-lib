@@ -50,7 +50,6 @@ type MulStarStatement struct {
 }
 
 // mul* in CGG21 Appendix C.6 Figure 31
-// todo: check proof for typos - especially modular reduction for some values.
 func NewMulStarProof(wit *MulStarWitness, stmt *MulStarStatement, rp *RingPedersenParams) *MulStarProof {
 	// derive some parameters
 	ec := stmt.X.Curve()
@@ -100,7 +99,6 @@ func NewMulStarProof(wit *MulStarWitness, stmt *MulStarStatement, rp *RingPeders
 
 // mul in CGG21 in CGG21 Appendix C.6 Figure 29
 // The Verifier checks the proof against the statement (N, X, Y, C)
-// TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *MulStarProof) Verify(stmt *MulStarStatement, rp *RingPedersenParams) bool {
 	if proof == nil {
 		return false
