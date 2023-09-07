@@ -1,14 +1,10 @@
 // Copyright 2023 Circle
 //
 // This file implements proof enc from CGG21 Section 6.1 Figure 14.
-// This is a proof that
-//  N0 = Paillier public key
-//  K = PaillierEncrypt(N0, k)
-//  k \in [-2^ell...2^ell]
-// Specifically, the Prover has secret input (k, rho) such that
+// The prover has secret input (k, rho) and the
+// The verifier checks the proof against the statement (N, X, Y, C)
 // K =(1 + N0)^k rho^N0 mod N0^2
 //  k \in [-2^ell...2^ell]
-// The verifier checks the proof against the statement (N, X, Y, C)
 
 package zkproofs
 

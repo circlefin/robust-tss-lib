@@ -1,19 +1,14 @@
 // Copyright 2023 Circle
 //
 // This file implements proof log* from CGG21 Appendix C.2 Figure 25.
-// This is a proof that
-//  N0 = Paillier public key
-//  C = PaillierEncrypt(N0, x)
-//  X = g^x \in G
-//  x \in [-2^ell,2^ell] where ell=|G|
-// Specifically,the Prover has secret input (x, rho) such that
+// The Prover has secret input (x, rho) and
+// the verifier checks the proof against the statement (N0, C, X)
 // C =(1 + N0)^x rhox^N0 mod N0^2
 // X = g^x \in G
 // the prover and verifier have auxiliary proof parameters
 // Nhat (safe bi-prime) and s,t\in Z/Nhat* (Ring Pedersen parameters)
 // The Verifier must generate the values (Nhat, s, t)
 // while the prover generates N0.
-// The verifier checks the proof against the statement (N0, C, X)
 
 package zkproofs
 

@@ -1,18 +1,14 @@
 // Copyright 2023 Circle
 //
 // This file implements proof mul* from CGG21 Appendix C.6 Figure 31.
-// Let g be the generator on EC curve
-// X = g^x (scalar multiplication)
-// C = PaillierEncrypt(N0, y)
-// D = PaillierEncrypt(N0, xy)
-// Formally, the prover has (x, rho) such that
+// The prover has secret (x, rho) and
+// the verifier checks the proof against the statement (N0, C, D, X)
 // X = g^x
 // D = C^x * rho^No mod N0^2
 // the prover and verifier have auxiliary proof parameters
 // Nhat (safe bi-prime) and s,t\in Z/Nhat* (Ring Pedersen parameters)
 // The Verifier must generate the values (Nhat, s, t)
 // while the prover generates N0.
-// The verifier checks the proof against the statement (N0, C, D, X)
 
 package zkproofs
 

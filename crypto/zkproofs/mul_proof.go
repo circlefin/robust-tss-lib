@@ -1,15 +1,10 @@
 // Copyright 2023 Circle
 //
 // This file implements proof mul from CGG21 Appendix C.6 Figure 29.
-// This is a proof that
-//  N = Paillier public key
-//  X = PaillierEncrypt(N, x)
-//  Y = PaillierEncrypt(N, y)
-//  C = PaillierEncrypt(N, x*y)
-// Specifically,the Prover has secret input (x, rho, rhox) such that
+// The prover has secret input (x, rho, rhox) and
+// the verifier checks the proof against the statement (N, X, Y, C)
 // X =(1 + N)^x rhox^N mod N^2
 // C = Y^x rho^N mod N^2
-// The verifier checks the proof against the statement (N, X, Y, C)
 
 package zkproofs
 

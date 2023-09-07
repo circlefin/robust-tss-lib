@@ -1,24 +1,16 @@
 // Copyright 2023 Circle
 //
 // This file implements proof aff-g from CGG21 Section 6.2 Figure 15.
-// This is a proof that
-//  N0 = Paillier public key
-//  N1 = Paillier public key
-//  X = g^x \in G
-//  Y = PaillierEncrypt(N1, y)
-//  C = PaillierEncrypt(N0, c)
-//  D = PaillierEncrypt(N0, cx+y)
-//  x \in [-2^ell,2^ell] where ell=|G|
-//  y \in [-2^ell',2^ell'] where ell=|G|
-// Specifically,the Prover has secret input (x, y, rho, rhoy) such that
+// Tbe prover has secret input (x, y, rho, rhoy) and
+// the verifier checks the proof against the statement (N0, N1, C, D, Y, X)
 //  X = g^x \in G
 //  Y = (1+N1)^y * rhoy^N1 mod N1^2
-//  D = C^x ( (1+n0)^y * rho^N0 mod N0^2
-// the prover and verifier have auxiliary proof parameters
+//  D = C^x * (1+N0)^y * rho^N0 mod N0^2
+//
+// The prover and verifier have auxiliary proof parameters
 // Nhat (safe bi-prime) and s,t\in Z/Nhat* (Ring Pedersen parameters)
 // The Verifier must generate the values (Nhat, s, t)
 // while the prover generates N0, N1.
-// The verifier checks the proof against the statement (N0, N1, C, D, Y, X)
 
 package zkproofs
 

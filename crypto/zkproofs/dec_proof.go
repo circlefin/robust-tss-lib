@@ -1,14 +1,10 @@
 // Copyright 2023 Circle
 //
 // This file implements proof dec in CGG21 Appendix C6 Figure 30.
-// This is a proof that
-//  N0 = Paillier public key
-//  C = PaillierEncrypt(N0, y)
-//  x = y mod q
-// Specifically, the Prover has secret input (y, rho) such that
+// The prover has secret input (y, rho) and
+// the verifier checks the proof against the statement (x, N0, C)
 //  C =(1 + N0)^y rho^N0 mod N0^2
 //  x = y mod q
-// The verifier checks the proof against the statement (x, N0, C)
 
 package zkproofs
 
@@ -103,7 +99,6 @@ func NewDecProof(wit *DecWitness, stmt *DecStatement, rp *RingPedersenParams) *D
 }
 
 // dec in CGG21 Appendix C6 Figure 30.
-// The Verifier checks the proof against the statement (N0, C, x)
 // TODO: determine if there are some values that need to be excluded (e.g. A /= 0).
 func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 	if proof == nil {

@@ -1,25 +1,17 @@
 // Copyright 2023 Circle
 //
 // This file modifies the proof aff-g from CGG21 Section 6.2 Figure 15.
-// This is a proof that
-//  N0 = Paillier public key
-//  N1 = Paillier public key
+// the prover has secret input (x, y, rho, rhoy) while the
+// verifier checks the proof against the statement (N0, N1, C, D, Y, X)
 //  X = g^x \in G
-//  Y = PaillierEncrypt(N1, q-y)
-//  C = PaillierEncrypt(N0, c)
-//  D = PaillierEncrypt(N0, cx+q-y)
-//  x \in [-2^ell,2^ell] where ell=|G|
-//  y \in [-2^ell',2^ell'] where ell=|G|
-// Specifically,the Prover has secret input (x, y, rho, rhoy) such that
-//  X = g^x \in G
-//  Y = (1+N1)^(q-y) * rhoyp^N1 mod N1^2
+//  Y = (1+N1)^(q-y) * rhoy^N1 mod N1^2
 //  Y^-1 = (1+N1)^(N1-q+y) * rhoy^N1 mod N1^2
-//  D = C^x ( (1+n0)^(q-y) * rho^N0 mod N0^2
-// the prover and verifier have auxiliary proof parameters
+//  D = C^x * (1+N0)^(q-y) * rho^N0 mod N0^2
+//
+// The prover and verifier have auxiliary proof parameters
 // Nhat (safe bi-prime) and s,t\in Z/Nhat* (Ring Pedersen parameters)
 // The Verifier must generate the values (Nhat, s, t)
 // while the prover generates N0, N1.
-// The verifier checks the proof against the statement (N0, N1, C, D, Y, X)
 //
 // The chief modification: the prover switches  z2=beta + e*y to z2=beta + e(q-y)
 
@@ -90,9 +82,8 @@ func NewAffGInvWitness(
 		return nil, nil, err
 	}
 
-	//  D = C^x ( (1+n0)^(q-y) * rho^N0 mod N0^2
+	//  D = C^x * (1+N0)^(q-y) * rho^N0 mod N0^2
 	qMinusY := new(big.Int).Sub(q, y)
-
 	Dprime, rho, err := pk0.EncryptAndReturnRandomness(qMinusY)
 	if err != nil {
 		return nil, nil, err
@@ -154,7 +145,6 @@ func (wit *AffGInvWitness) ToAffGWitness(stmt *AffGInvStatement) *AffGWitness {
 }
 
 // aff-g from CGG21 Section 6.2 Figure 15.
-// todo: check proof for typos - especially modular reduction for some values.
 func NewAffGInvProof(wit *AffGInvWitness, stmt *AffGInvStatement, rp *RingPedersenParams) (*AffGInvProof, error) {
 	gwit := wit.ToAffGWitness(stmt)
 	gstmt, err := stmt.ToAffGStatement()
@@ -167,7 +157,6 @@ func NewAffGInvProof(wit *AffGInvWitness, stmt *AffGInvStatement, rp *RingPeders
 }
 
 // aff-g from CGG21 Section 6.2 Figure 15.
-// The Verifier checks the proof against the statement using inverse
 func (proof *AffGInvProof) Verify(stmt *AffGInvStatement, rp *RingPedersenParams) bool {
 	if proof == nil {
 		return false

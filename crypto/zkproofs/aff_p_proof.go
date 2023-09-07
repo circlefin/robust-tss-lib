@@ -1,27 +1,19 @@
 // Copyright 2023 Circle
 //
 // This file implements proof aff-p from CGG21 Appendix C.3 Figure 26.
-// This is a proof that
-//  N0 = Paillier public key
-//  N1 = Paillier public key
-//  C = PaillierEncrypt(N0, c)
-//  D  = PaillierEncrypt(N0, xc + y)
-//  X = PaillierEncrypt(N1, x)
-//  Y = PaillierEncrypt(N1, y)
-//  x \in [-2^ell,2^ell] where ell=|G|
-//  y \in [-2^ell',2^ell'] where ell'=|G|
-// Specifically,the Prover has secret input (x, y, rho, rhox, rhoy) such that
+// The prover has secret input (x, y, rho, rhox, rhoy) and the
+// verifier checks the proof against the statement (N0, N1 C, D, X, Y)
 //  C = PaillierEncrypt(N0, c)
 //  D  = C^x * (1+N0)^y * rho^N0 mod N0^2
 //  X = (1+N1)^x * rhox^N1 mod N1^2
 //  Y = (1+N1)^y * rhoy^N1 mod N1^2
 //  x \in [-2^ell,2^ell] where ell=|G|
 //  y \in [-2^ell',2^ell'] where ell'=|G|
+//
 // the prover and verifier have auxiliary proof parameters
 // Nhat (safe bi-prime) and s,t\in Z/Nhat* (Ring Pedersen parameters)
 // The Verifier must generate the values (Nhat, s, t)
 // while the prover generates N0, N1.
-// The verifier checks the proof against the statement (N0, N1 C, D, X, Y)
 
 package zkproofs
 
@@ -78,7 +70,6 @@ type AffPStatement struct {
 }
 
 // aff-p from CGG21 Appendix C.3 Figure 26
-// todo: check proof for typos - especially modular reduction for some values.
 func NewAffPProof(wit *AffPWitness, stmt *AffPStatement, rp *RingPedersenParams) (*AffPProof, error) {
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
 	ecpc := NewEll(stmt.Ell)
@@ -207,6 +198,7 @@ func (proof *AffPProof) Verify(stmt *AffPStatement, rp *RingPedersenParams) bool
 
 	// Get challenge
 	e := proof.GetChallenge(stmt, rp)
+
 	// check C^z1 (1+N0)^z2 w^N0 mod N02 == A * D^e mod N02
 	// left1prime := (1+N0)^z1 w^N0 mod N02
 	pkN0 := &paillier.PublicKey{N: stmt.N0}
