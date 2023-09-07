@@ -112,6 +112,11 @@ func (proof *DecProof) Verify(stmt *DecStatement, rp *RingPedersenParams) bool {
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
 
+    // otherwise first verification equation trivially true
+    if IsZero(proof.W) || IsZero(proof.A) {
+        return false
+    }
+
 	// check (1+N0)^z1 * w^N0 mod N02 == A * C^e mod N02
 	pkN0 := &paillier.PublicKey{N: stmt.N0}
 	left1 := pkN0.EncryptWithRandomnessNoErrChk(proof.Z1, proof.W)

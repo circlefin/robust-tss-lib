@@ -51,7 +51,6 @@ type LogStarStatement struct {
 }
 
 // log* in CGG21 in CGG21 Appendix C.2 Figure 25
-// todo: check proof for typos - especially modular reduction for some values.
 func NewLogStarProof(wit *LogStarWitness, stmt *LogStarStatement, rp *RingPedersenParams) *LogStarProof {
 	if stmt.G == nil {
 		ec := stmt.X.Curve()
@@ -126,6 +125,11 @@ func (proof *LogStarProof) Verify(stmt *LogStarStatement, rp *RingPedersenParams
 
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
+
+    // otherwise first verification equation is trivially true
+	if IsZero(proof.A) || IsZero(proof.Z2) {
+	    return false
+	}
 
 	// check (1+N0)^z1 * z2^N0 mod N02 == A * C^e mod N02
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)

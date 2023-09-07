@@ -161,6 +161,11 @@ func (proof *AffGProof) Verify(stmt *AffGStatement, rp *RingPedersenParams) bool
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
 
+    // otherwise first verification equation trivially true
+    if IsZero(proof.A) || IsZero(proof.W) {
+        return false
+    }
+
 	// check C^z1 (1+n0)^z2 w^N0 == A * D^e mod No^2A
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
 	pkN0 := &paillier.PublicKey{N: stmt.N0}
@@ -177,6 +182,11 @@ func (proof *AffGProof) Verify(stmt *AffGStatement, rp *RingPedersenParams) bool
 	if err != nil || !left2.Equals(right2) {
 		return false
 	}
+
+    // otherwise third verification equation trivially true
+    if IsZero(proof.Wy) || IsZero(proof.By) {
+        return false
+    }
 
 	// check if (1+N1)^z2 * wy^N1 == By * Y^e mod N1^2
 	N12 := new(big.Int).Mul(stmt.N1, stmt.N1)

@@ -95,12 +95,22 @@ func (proof *MulProof) Verify(stmt *MulStatement) bool {
 	// hash to get challenge
 	e := proof.GetChallenge(stmt)
 
+    // otherwise first verification equation trivially true
+    if IsZero(proof.U) || IsZero(proof.A) {
+        return false
+    }
+
 	// check Y^z * u^N mod N2 == A * C^e mod N2
 	left1 := PseudoPaillierEncrypt(stmt.Y, proof.Z, proof.U, stmt.N, N2)
 	right1 := ATimesBToTheCModN(proof.A, stmt.C, e, N2)
 	if left1.Cmp(right1) != 0 {
 		return false
 	}
+
+    // otherwise first verification equation trivially true
+    if IsZero(proof.V) || IsZero(proof.B) {
+        return false
+    }
 
 	// Second verification in Figure 29 states to check
 	// (1 + N)^z * v^N == B * X^e mod N2

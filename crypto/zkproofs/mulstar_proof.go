@@ -117,6 +117,11 @@ func (proof *MulStarProof) Verify(stmt *MulStarStatement, rp *RingPedersenParams
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
 
+    // otherwise first verification equation trivially true
+    if IsZero(proof.W) || IsZero(proof.A) {
+        return false
+    }
+
 	// Check C^z1 w^N0 mod N02 == A * D^e mod N02
 	left1 := PseudoPaillierEncrypt(stmt.C, proof.Z1, proof.W, stmt.N0, N02)
 	right1 := ATimesBToTheCModN(proof.A, stmt.D, e, N02)
