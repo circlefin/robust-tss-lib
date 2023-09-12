@@ -195,6 +195,8 @@ func (round *round4) CleanUpPreSigningData() {
 	round.temp.delta = nil
 	round.temp.alpha = nil
 	round.temp.alphaHat = nil
+	round.temp.bigH = nil
+	round.temp.bigDelta = nil
 }
 
 func (round *round4) Update() (bool, *tss.Error) {
