@@ -89,7 +89,7 @@ func (round *finalization) GetSumS() *big.Int {
 func (round *finalization) VerifyRound5Messages() *tss.Error {
 	i := round.PartyID().Index
 	rp := round.key.GetRingPedersen(i)
-	var err *tss.Error
+	errChs := make(chan *tss.Error, len(round.temp.signRound5Messages))
 	wg := sync.WaitGroup{}
 	for j, msg := range round.temp.signRound5Messages {
 		r5msg := msg.Content().(*SignRound5Message)
@@ -110,15 +110,18 @@ func (round *finalization) VerifyRound5Messages() *tss.Error {
 				X:   sj,
 			}
 			proof, err := r5msg.UnmarshalProof(ec)
+			Pj := round.Parties().IDs()[j]
 			if err != nil {
-				err = round.WrapError(errors.New(fmt.Sprintf("failed to parse proof from party %d.", j)))
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to parse proof from party %d.", j)), Pj)
 			}
-			if !proof[i].Verify(statement, rp) {
-				err = round.WrapError(errors.New(fmt.Sprintf("failed to verify proof from party %d.", j)))
+			if proof[i].Verify(statement, rp) {
+				errChs <- round.WrapError(errors.New(fmt.Sprintf("failed to verify proof from party %d.", j)), Pj)
 			}
 		}(j, r5msg)
 	}
 	wg.Wait()
+	close(errChs)
+	err := round.WrapErrorChs(round.PartyID(), errChs, "Failed to process round 5 messages")
 	return err
 }
 

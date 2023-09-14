@@ -48,7 +48,7 @@ func AliceInit(
 	wg := sync.WaitGroup{}
 	wg.Add(len(rpV))
 	proofs := make([]*zkproofs.EncProof, len(rpV))
-	err = nil
+	errChs := make(chan error, len(rpV))
 	for i, rp := range rpV {
 		go func(i int, rp *zkproofs.RingPedersenParams) {
 			defer wg.Done()
@@ -57,12 +57,17 @@ func AliceInit(
 				return
 			}
 			proofs[i], err = zkproofs.NewEncProof(witness, statement, rp)
+			if err != nil {
+			    errChs <- err
+			}
 		}(i, rp)
 	}
 	wg.Wait()
-	if err != nil {
-		return nil, nil, err
-	}
+	close(errChs)
+    if len(errChs) > 0 {
+        err:= <- errChs
+        return nil, nil, err
+    }
 	return cA, proofs, nil
 }
 
@@ -141,6 +146,7 @@ func BobRespondsP(
 	wg := sync.WaitGroup{}
 	wg.Add(len(rpV))
 	proofs = make([]*zkproofs.AffPProof, len(rpV))
+	errChs := make(chan error, len(rpV))
 	for i, rp := range rpV {
 		go func(i int, rp *zkproofs.RingPedersenParams) {
 			defer wg.Done()
@@ -148,11 +154,18 @@ func BobRespondsP(
 				proofs[i] = nil
 				return
 			}
-			proofs[i], _ = zkproofs.NewAffPProof(witness, statement, rp)
+			proof, err := zkproofs.NewAffPProof(witness, statement, rp)
+			if err != nil {
+			    errChs <- err
+			}
+			proofs[i] = proof
 		}(i, rp)
 	}
 	wg.Wait()
-
+	close(errChs)
+    if len(errChs) > 0 {
+        err = <- errChs
+    }
 	return
 }
 
@@ -248,6 +261,7 @@ func BobRespondsDL(
 	wg := sync.WaitGroup{}
 	wg.Add(len(rpV))
 	proofs = make([]*zkproofs.AffGProof, len(rpV))
+	errChs := make(chan error, len(rpV))
 	for i, rp := range rpV {
 		go func(i int, rp *zkproofs.RingPedersenParams) {
 			defer wg.Done()
@@ -257,12 +271,16 @@ func BobRespondsDL(
 			}
 			proof, err := zkproofs.NewAffGProof(witness, statement, rp)
 			if err != nil {
-				return
+			    errChs <- err
 			}
 			proofs[i] = proof
 		}(i, rp)
 	}
 	wg.Wait()
+	close(errChs)
+    if len(errChs) > 0 {
+        err = <- errChs
+    }
 	return
 }
 
@@ -301,6 +319,7 @@ func BobRespondsG(
 	wg := sync.WaitGroup{}
 	wg.Add(len(rpV))
 	proofs = make([]*zkproofs.AffGInvProof, len(rpV))
+	errChs := make(chan error, len(rpV))
 	for i, rp := range rpV {
 		go func(i int, rp *zkproofs.RingPedersenParams) {
 			defer wg.Done()
@@ -310,12 +329,16 @@ func BobRespondsG(
 			}
 			proof, err := zkproofs.NewAffGInvProof(witness, statement, rp)
 			if err != nil {
-				return
+			    errChs <- err
 			}
 			proofs[i] = proof
 		}(i, rp)
 	}
 	wg.Wait()
+	close(errChs)
+    if len(errChs) > 0 {
+        err = <- errChs
+    }
 	return
 }
 
