@@ -69,7 +69,14 @@ func (m *SignRound1Message1) UnmarshalProofXGamma() (*zkproofs.EncProof, error) 
 }
 
 func (m *SignRound1Message1) UnmarshalProofXKw(ec elliptic.Curve) (*zkproofs.MulStarProof, error) {
-	return zkproofs.MulStarProofFromBytes(ec, m.GetProofXKw())
+	var proofInBytes [][]byte = m.GetProofXKw()
+	np, err := new(zkproofs.MulStarProof).ProofFromBytes(ec, proofInBytes)
+	if err != nil {
+	    return nil, err
+	}
+
+    newProof := np.(*zkproofs.MulStarProof)
+    return newProof, nil
 }
 
 func NewSignRound1Message2(
