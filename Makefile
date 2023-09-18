@@ -10,6 +10,9 @@ protob:
 	@echo "--> Building Protocol Buffers"
 	@for protocol in message signature ecdsa-cggplus ecdsa-accsigning ecdsa-keygen ecdsa-signing ecdsa-resharing eddsa-keygen eddsa-signing eddsa-resharing; do \
 		echo "Generating $$protocol.pb.go" ; \
+		$dot = . ; \
+		$file = ./protob/$$protocol.proto ; \
+		echo "--go_out={$$dot} {$$file};" \
 		protoc --go_out=. ./protob/$$protocol.proto ; \
 	done
 
