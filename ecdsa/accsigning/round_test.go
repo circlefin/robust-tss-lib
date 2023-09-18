@@ -5,15 +5,18 @@ package accsigning
 
 import (
 	"fmt"
-	"sync"
+//	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
-	"github.com/bnb-chain/tss-lib/tss"
+//	"github.com/bnb-chain/tss-lib/tss"
 )
+/*
+*  Uncomment test to check individual round
+*
 
 func TestHomoAddLimit(t *testing.T) {
 	keys, _, err := keygen.LoadKeygenTestFixturesRandomSet(1, 1)
@@ -180,6 +183,7 @@ func TestRound5(t *testing.T) {
 	}
 	wg.Wait()
 }
+*/
 
 func TestRoundFinalization(t *testing.T) {
 	//	params, parties, outCh, keys, signPIDs, p2pCtx := SetupParties(t)

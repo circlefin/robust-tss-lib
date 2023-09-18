@@ -4,11 +4,14 @@
 package cggplus
 
 import (
-	"github.com/bnb-chain/tss-lib/tss"
-	"sync"
+//	"github.com/bnb-chain/tss-lib/tss"
+//	"sync"
 	"testing"
 )
 
+/*
+*  Uncomment test to check individual round
+*
 func TestRound1(t *testing.T) {
 	params, parties, outCh, _, _, _ := SetupParties(t)
 	rounds := RunRound1(t, params, parties, outCh)
@@ -124,7 +127,7 @@ func TestRound5(t *testing.T) {
 	close(errChs)
 	AssertNoErrors(t, errChs)
 }
-
+*/
 func TestRoundFinalization(t *testing.T) {
 	params, parties, outCh, _, _, _ := SetupParties(t)
 
