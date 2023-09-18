@@ -4,9 +4,9 @@
 package cggplus
 
 import (
+	"github.com/bnb-chain/tss-lib/tss"
 	"sync"
 	"testing"
-	"github.com/bnb-chain/tss-lib/tss"
 )
 
 func TestRound1(t *testing.T) {

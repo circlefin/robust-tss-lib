@@ -198,10 +198,10 @@ func (proof *AffPProof) Verify(stmt *AffPStatement, rp *RingPedersenParams) bool
 	// Get challenge
 	e := proof.GetChallenge(stmt, rp)
 
-    // otherwise first verification equation trivially true
-    if IsZero(proof.W) || IsZero(proof.A) {
-        return false
-    }
+	// otherwise first verification equation trivially true
+	if IsZero(proof.W) || IsZero(proof.A) {
+		return false
+	}
 
 	// check C^z1 (1+N0)^z2 w^N0 mod N02 == A * D^e mod N02
 	// left1prime := (1+N0)^z1 w^N0 mod N02
@@ -213,10 +213,10 @@ func (proof *AffPProof) Verify(stmt *AffPStatement, rp *RingPedersenParams) bool
 		return false
 	}
 
-    // otherwise second verification equation trivially true
-    if IsZero(proof.Wx) || IsZero(proof.Bx) {
-        return false
-    }
+	// otherwise second verification equation trivially true
+	if IsZero(proof.Wx) || IsZero(proof.Bx) {
+		return false
+	}
 
 	// check (1+N1)^z1 wx^N1 mod N1^2 == Bx * X^e mod N1^2
 	pkN1 := &paillier.PublicKey{N: stmt.N1}
@@ -226,10 +226,10 @@ func (proof *AffPProof) Verify(stmt *AffPStatement, rp *RingPedersenParams) bool
 		return false
 	}
 
-    // otherwise third verification equation trivially true
-    if IsZero(proof.Wy) || IsZero(proof.By) {
-        return false
-    }
+	// otherwise third verification equation trivially true
+	if IsZero(proof.Wy) || IsZero(proof.By) {
+		return false
+	}
 
 	// check (1+N1)^z2 wy^N1 mod N1^2 == By * Y^e mod N1^2
 	left3, err := pkN1.EncryptWithRandomness(proof.Z2, proof.Wy)

@@ -55,7 +55,7 @@ func (m *SignRound1Message1) ValidateBasic() bool {
 func (m *SignRound1Message1) UnmarshalRangeProofAlice() (*zkproofs.EncProof, error) {
 	proof, err := new(zkproofs.EncProof).ProofFromBytes(nil, m.GetRangeProofAlice())
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
 	return proof.(*zkproofs.EncProof), nil
 }
@@ -63,7 +63,7 @@ func (m *SignRound1Message1) UnmarshalRangeProofAlice() (*zkproofs.EncProof, err
 func (m *SignRound1Message1) UnmarshalProofXGamma() (*zkproofs.EncProof, error) {
 	proof, err := new(zkproofs.EncProof).ProofFromBytes(nil, m.GetProofXGamma())
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
 	return proof.(*zkproofs.EncProof), nil
 }
@@ -72,11 +72,11 @@ func (m *SignRound1Message1) UnmarshalProofXKw(ec elliptic.Curve) (*zkproofs.Mul
 	var proofInBytes [][]byte = m.GetProofXKw()
 	np, err := new(zkproofs.MulStarProof).ProofFromBytes(ec, proofInBytes)
 	if err != nil {
-	    return nil, err
+		return nil, err
 	}
 
-    newProof := np.(*zkproofs.MulStarProof)
-    return newProof, nil
+	newProof := np.(*zkproofs.MulStarProof)
+	return newProof, nil
 }
 
 func NewSignRound1Message2(

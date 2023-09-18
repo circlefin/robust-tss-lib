@@ -24,8 +24,8 @@ func ModInt(mod *big.Int) *modInt {
 }
 
 func (mi *modInt) Mod(x *big.Int) *big.Int {
-    i := new(big.Int)
-    return i.Mod(x, mi.i())
+	i := new(big.Int)
+	return i.Mod(x, mi.i())
 }
 
 func (mi *modInt) Add(x, y *big.Int) *big.Int {
@@ -61,21 +61,21 @@ func (mi *modInt) ModInverse(g *big.Int) *big.Int {
 }
 
 func (mi *modInt) IsCongruent(a, b *big.Int) bool {
-    amodi := new(big.Int).Mod(a, mi.i())
-    bmodi := new(big.Int).Mod(b, mi.i())
+	amodi := new(big.Int).Mod(a, mi.i())
+	bmodi := new(big.Int).Mod(b, mi.i())
 	return amodi.Cmp(bmodi) == 0
 }
 
 func (mi *modInt) IsAdditiveInverse(a, b *big.Int) bool {
-    sum := mi.Add(a, b)
-    zero := big.NewInt(0)
-    return mi.IsCongruent(sum, zero)
+	sum := mi.Add(a, b)
+	zero := big.NewInt(0)
+	return mi.IsCongruent(sum, zero)
 }
 
 func (mi *modInt) IsMultInverse(a, b *big.Int) bool {
-    prod := mi.Mul(a, b)
-    one := big.NewInt(1)
-    return mi.IsCongruent(prod, one)
+	prod := mi.Mul(a, b)
+	one := big.NewInt(1)
+	return mi.IsCongruent(prod, one)
 }
 
 func (mi *modInt) i() *big.Int {

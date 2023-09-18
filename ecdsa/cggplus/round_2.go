@@ -27,6 +27,8 @@ func (round *round2) Start() *tss.Error {
 	psi := Make2DSlice[*zkproofs.AffGInvProof](partyCount)
 	psiHat := Make2DSlice[*zkproofs.AffGInvProof](partyCount)
 	psiPrime := make([]*zkproofs.LogStarProof, partyCount)
+	ec := round.Params().EC()
+	round.temp.pointGamma[i] = crypto.ScalarBaseMult(ec, round.temp.gamma)
 
 	errChs := make(chan *tss.Error, (len(round.Parties().IDs())-1)*3)
 	round.VerifyRound1Messages(errChs)
@@ -165,9 +167,7 @@ func (round *round2) BobRespondsGamma(j int, Pj *tss.PartyID, proofs [][]*zkproo
 func (round *round2) ComputeProofPsiPrime(j int, Pj *tss.PartyID, proofs []*zkproofs.LogStarProof, wg *sync.WaitGroup, errChs chan *tss.Error) {
 	defer wg.Done()
 	i := round.PartyID().Index
-
 	ec := round.Params().EC()
-	round.temp.pointGamma[i] = crypto.ScalarBaseMult(ec, round.temp.gamma)
 
 	_, rho, err := round.key.PaillierSK.DecryptFull(round.temp.bigG[i])
 	if err != nil {

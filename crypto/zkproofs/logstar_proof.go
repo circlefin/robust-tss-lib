@@ -125,9 +125,9 @@ func (proof *LogStarProof) Verify(stmt *LogStarStatement, rp *RingPedersenParams
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
 
-    // otherwise first verification equation is trivially true
+	// otherwise first verification equation is trivially true
 	if IsZero(proof.A) || IsZero(proof.Z2) {
-	    return false
+		return false
 	}
 
 	// check (1+N0)^z1 * z2^N0 mod N02 == A * C^e mod N02

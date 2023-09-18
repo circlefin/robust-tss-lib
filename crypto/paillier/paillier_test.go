@@ -149,7 +149,7 @@ func TestMultInv(t *testing.T) {
 
 	assert.True(t, common.ModInt(publicKey.N).IsCongruent(zero, actual))
 	assert.True(t, common.ModInt(publicKey.N).IsAdditiveInverse(num, negNum))
-    assert.Equal(t, 0, negNum.Cmp(NMinusNum))
+	assert.Equal(t, 0, negNum.Cmp(NMinusNum))
 	assert.True(t, common.ModInt(q).IsCongruent(zero, actual))
 	assert.False(t, common.ModInt(q).IsAdditiveInverse(num, negNum))
 }

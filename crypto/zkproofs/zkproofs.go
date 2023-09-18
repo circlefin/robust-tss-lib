@@ -142,10 +142,10 @@ func Q(ec elliptic.Curve) *big.Int {
 }
 
 func IsZero(val *big.Int) bool {
-    if val.Cmp(big.NewInt(0))== 0 {
-        return true
-    }
-    return false
+	if val.Cmp(big.NewInt(0)) == 0 {
+		return true
+	}
+	return false
 }
 
 // returns c = gamma^m * rho^N mod N^2

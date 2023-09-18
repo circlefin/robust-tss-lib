@@ -115,10 +115,10 @@ func (proof *EncProof) Verify(stmt *EncStatement, rp *RingPedersenParams) bool {
 	// hash to get challenge
 	e := proof.GetChallenge(stmt, rp)
 
-    // otherwise first verification equation trivially true
-    if IsZero(proof.Z2) || IsZero(proof.A) {
-        return false
-    }
+	// otherwise first verification equation trivially true
+	if IsZero(proof.Z2) || IsZero(proof.A) {
+		return false
+	}
 
 	// check (1+N0)^z1 * z2^N0 mod N02 == A * K^e mod N02
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)

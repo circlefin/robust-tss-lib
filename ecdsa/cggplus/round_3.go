@@ -26,6 +26,14 @@ func (round *round3) Start() *tss.Error {
 	partyCount := len(round.Parties().IDs())
 	errChs := make(chan *tss.Error, partyCount*partyCount*3)
 	wg := sync.WaitGroup{}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		round.VerifyRound2Messages(errChs)
+	}()
+	wg.Wait()
+
 	for sender, _ := range round.Parties().IDs() {
 		if sender == i {
 			continue
@@ -34,11 +42,6 @@ func (round *round3) Start() *tss.Error {
 		go round.AliceEndW(sender, &wg, errChs)
 		go round.AliceEndGamma(sender, &wg, errChs)
 	}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		round.VerifyRound2Messages(errChs)
-	}()
 	wg.Wait()
 	close(errChs)
 	err := round.WrapErrorChs(round.PartyID(), errChs, "Failed to process round 2 messages")
@@ -80,15 +83,24 @@ func (round *round3) VerifyRound2Messages(errChs chan *tss.Error) {
 	i := round.PartyID().Index
 	wg := sync.WaitGroup{}
 	for sender, Psender := range round.Parties().IDs() {
+		r2msg2 := round.temp.signRound2Message2s[sender].Content().(*SignRound2Message2)
+		ec := round.Params().EC()
+		pointGamma, err := r2msg2.UnmarshalGamma(ec)
+		if err != nil {
+			errChs <- round.WrapError(errors.New("could not UnmarshalGamma"), Psender)
+			return
+		}
+		round.temp.pointGamma[sender] = pointGamma
+
 		for recipient, _ := range round.Parties().IDs() {
 			if sender == recipient || sender == i {
 				continue
 			}
 			wg.Add(1)
-			go func(sender, recipient int, errChs chan *tss.Error) {
+			go func(sender, recipient int, Psender *tss.PartyID, errChs chan *tss.Error) {
 				defer wg.Done()
 				round.VerifyRound2Message(sender, recipient, Psender, errChs)
-			}(sender, recipient, errChs)
+			}(sender, recipient, Psender, errChs)
 		}
 	}
 	wg.Wait()
@@ -108,14 +120,6 @@ func (round *round3) VerifyRound2Message(sender, recipient int, Psender *tss.Par
 	round.temp.bigF[sender][recipient] = r2msg1.UnmarshalBigF()
 	round.temp.bigDHat[sender][recipient] = r2msg1.UnmarshalBigDHat()
 	round.temp.bigFHat[sender][recipient] = r2msg1.UnmarshalBigFHat()
-
-	r2msg2 := round.temp.signRound2Message2s[sender].Content().(*SignRound2Message2)
-	pointGamma, err := r2msg2.UnmarshalGamma(ec)
-	if err != nil {
-		errChs <- round.WrapError(errors.New("could not UnmarshalGamma"), Psender)
-		return
-	}
-	round.temp.pointGamma[sender] = pointGamma
 
 	// verify what the other recipient received
 	if verifier != recipient {
@@ -163,6 +167,7 @@ func (round *round3) VerifyRound2Message(sender, recipient int, Psender *tss.Par
 	}
 
 	// verify for all
+	r2msg2 := round.temp.signRound2Message2s[sender].Content().(*SignRound2Message2)
 	psiPrime, err := r2msg2.UnmarshalPsiPrime(ec)
 	if err != nil {
 		errChs <- round.WrapError(errors.New("could not UnmarshalPsiPrime"), Psender)
@@ -233,6 +238,7 @@ func (round *round3) AliceEndGamma(sender int, wg *sync.WaitGroup, errChs chan *
 	}
 	round.temp.bigD[sender][i] = r2msg1.UnmarshalBigD()
 	round.temp.bigF[sender][i] = r2msg1.UnmarshalBigF()
+
 	psi, err := r2msg1.UnmarshalPsi(ec)
 	if err != nil {
 		errChs <- round.WrapError(errors.New("could not UnmarshalPsi"), Psender)

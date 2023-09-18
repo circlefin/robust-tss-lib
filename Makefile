@@ -26,12 +26,7 @@ clean_test:
 test_unit:
 	@echo "--> Running Unit Tests"
 	@echo "!!! WARNING: This will take a long time :)"
-#	go test -timeout 60m -v github.com/bnb-chain/tss-lib/crypto/paillier
-#	go test -timeout 60m -v github.com/bnb-chain/tss-lib/crypto/zkproofs
-#	go test -timeout 60m -v github.com/bnb-chain/tss-lib/crypto/accmta
-	go test -timeout 60m -v github.com/bnb-chain/tss-lib/ecdsa/accsigning
-#	go test -timeout 60m -v github.com/bnb-chain/tss-lib/ecdsa/cggplus
-#	go test -timeout 60m $(PACKAGES)
+	go test -timeout 60m $(PACKAGES)
 
 test_unit_race:
 	@echo "--> Running Unit Tests (with Race Detection)"

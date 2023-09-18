@@ -84,9 +84,9 @@ func (local LocalPartySaveData) GetRingPedersen(partyIdIndex int) *zkproofs.Ring
 }
 
 func (local LocalPartySaveData) GetAllRingPedersen() []*zkproofs.RingPedersenParams {
-    rps := make([]*zkproofs.RingPedersenParams, len(local.NTildej))
-    for j, _ := range local.NTildej {
-        rps[j] = local.GetRingPedersen(j)
+	rps := make([]*zkproofs.RingPedersenParams, len(local.NTildej))
+	for j, _ := range local.NTildej {
+		rps[j] = local.GetRingPedersen(j)
 	}
 	return rps
 }
