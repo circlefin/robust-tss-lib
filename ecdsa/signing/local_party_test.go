@@ -52,7 +52,7 @@ func TestE2EConcurrent(t *testing.T) {
 
 	errCh := make(chan *tss.Error, len(signPIDs))
 	outCh := make(chan tss.Message, len(signPIDs))
-	endCh := make(chan common.SignatureData, len(signPIDs))
+	endCh := make(chan *common.SignatureData, len(signPIDs))
 
 	updater := test.SharedPartyUpdater
 
@@ -163,7 +163,7 @@ func TestE2EWithHDKeyDerivation(t *testing.T) {
 
 	errCh := make(chan *tss.Error, len(signPIDs))
 	outCh := make(chan tss.Message, len(signPIDs))
-	endCh := make(chan common.SignatureData, len(signPIDs))
+	endCh := make(chan *common.SignatureData, len(signPIDs))
 
 	updater := test.SharedPartyUpdater
 
