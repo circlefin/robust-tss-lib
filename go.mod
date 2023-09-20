@@ -4,13 +4,12 @@ go 1.18
 
 require (
 	github.com/agl/ed25519 v0.0.0-20200225211852-fd4d107ace12
-	github.com/btcsuite/btcd v0.0.0-20190629003639-c26ffa870fd8 // upgrade will require code change
-	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d // upgrade will require code change
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/btcsuite/btcd v0.23.4
+	github.com/btcsuite/btcd/btcec/v2 v2.3.2
+	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/edwards/v2 v2.0.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-log v1.0.5
-	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/otiai10/primes v0.0.0-20210501021515-f1b2be525a11
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.4
