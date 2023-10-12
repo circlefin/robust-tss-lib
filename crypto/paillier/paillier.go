@@ -109,11 +109,10 @@ func GenerateKeyPair(ctx context.Context, modulusBitLen int, optionalConcurrency
 
 // ----- //
 
-func (publicKey *PublicKey) EncryptAndReturnRandomness(m *big.Int) (c *big.Int, x *big.Int, err error) {
+func (publicKey *PublicKey) EncryptWithRandomness(m *big.Int, x *big.Int) (c *big.Int, err error) {
 	if m.Cmp(zero) == -1 || m.Cmp(publicKey.N) != -1 { // m < 0 || m >= N ?
-		return nil, nil, ErrMessageTooLong
+		return nil, ErrMessageTooLong
 	}
-	x = common.GetRandomPositiveRelativelyPrimeInt(publicKey.N)
 	N2 := publicKey.NSquare()
 	// 1. gamma^m mod N2
 	Gm := new(big.Int).Exp(publicKey.Gamma(), m, N2)
@@ -121,6 +120,23 @@ func (publicKey *PublicKey) EncryptAndReturnRandomness(m *big.Int) (c *big.Int, 
 	xN := new(big.Int).Exp(x, publicKey.N, N2)
 	// 3. (1) * (2) mod N2
 	c = common.ModInt(N2).Mul(Gm, xN)
+	return
+}
+
+func (publicKey *PublicKey) EncryptWithRandomnessNoErrChk(m *big.Int, x *big.Int) (c *big.Int) {
+	N2 := publicKey.NSquare()
+	// 1. gamma^m mod N2
+	Gm := new(big.Int).Exp(publicKey.Gamma(), m, N2)
+	// 2. x^N mod N2
+	xN := new(big.Int).Exp(x, publicKey.N, N2)
+	// 3. (1) * (2) mod N2
+	c = common.ModInt(N2).Mul(Gm, xN)
+	return
+}
+
+func (publicKey *PublicKey) EncryptAndReturnRandomness(m *big.Int) (c *big.Int, x *big.Int, err error) {
+	x = common.GetRandomPositiveRelativelyPrimeInt(publicKey.N)
+	c, err = publicKey.EncryptWithRandomness(m, x)
 	return
 }
 
@@ -141,6 +157,29 @@ func (publicKey *PublicKey) HomoMult(m, c1 *big.Int) (*big.Int, error) {
 	return common.ModInt(N2).Exp(c1, m), nil
 }
 
+func (publicKey *PublicKey) HomoMultAndReturnRandomness(m, c1 *big.Int) (product *big.Int, x *big.Int, err error) {
+	ciphertext, err := publicKey.HomoMult(m, c1)
+	if err != nil {
+		return nil, nil, err
+	}
+	N2 := publicKey.NSquare()
+	// 2. x^N mod N2
+	x = common.GetRandomPositiveRelativelyPrimeInt(publicKey.N)
+	xN := common.ModInt(N2).Exp(x, publicKey.N)
+	// 3. (ciphertext) * (2) mod N2
+	product = common.ModInt(N2).Mul(ciphertext, xN)
+	return
+}
+
+func (publicKey *PublicKey) HomoMultInv(c1 *big.Int) (*big.Int, error) {
+	N2 := publicKey.NSquare()
+	if c1.Cmp(zero) == -1 || c1.Cmp(N2) != -1 { // c1 < 0 || c1 >= N2 ?
+		return nil, ErrMessageTooLong
+	}
+	// cipher^m mod N2
+	return common.ModInt(N2).Exp(c1, big.NewInt(-1)), nil
+}
+
 func (publicKey *PublicKey) HomoAdd(c1, c2 *big.Int) (*big.Int, error) {
 	N2 := publicKey.NSquare()
 	if c1.Cmp(zero) == -1 || c1.Cmp(N2) != -1 { // c1 < 0 || c1 >= N2 ?
@@ -151,6 +190,17 @@ func (publicKey *PublicKey) HomoAdd(c1, c2 *big.Int) (*big.Int, error) {
 	}
 	// c1 * c2 mod N2
 	return common.ModInt(N2).Mul(c1, c2), nil
+}
+
+func (publicKey *PublicKey) HomoAddInt(m, c1 *big.Int) (*big.Int, error) {
+	if m.Cmp(zero) == -1 || m.Cmp(publicKey.N) != -1 { // m < 0 || m >= N ?
+		return nil, ErrMessageTooLong
+	}
+	c2, err := publicKey.EncryptWithRandomness(m, big.NewInt(1))
+	if err != nil {
+		return nil, err
+	}
+	return publicKey.HomoAdd(c1, c2)
 }
 
 func (publicKey *PublicKey) NSquare() *big.Int {
@@ -186,6 +236,35 @@ func (privateKey *PrivateKey) Decrypt(c *big.Int) (m *big.Int, err error) {
 	inv := new(big.Int).ModInverse(Lg, privateKey.N)
 	m = common.ModInt(privateKey.N).Mul(Lc, inv)
 	return
+}
+
+// Extended decryption algorithm that retrieves both the message
+// and the randomness used to create it.
+// Pascal Paillier. Public-key cryptosystems based on composite degree residuosity classes.
+// Eurocrypt 99. Pages 223-238. Decryption algorithm in section 5.
+// https://www.researchgate.net/publication/221348062_Public-Key_Cryptosystems_Based_on_Composite_Degree_Residuosity_Classes
+//
+// Paillier paper uses different variable names as the rest of this code.
+// Rhe = m1
+func (privateKey *PrivateKey) DecryptFull(c *big.Int) (m *big.Int, rho *big.Int, err error) {
+	m, err = privateKey.Decrypt(c)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 4. (Paillier Step 2) c' = cg^(-m1) mod n
+	// 4. (This code) cprime = c * gamma^(-m) mod N
+	negM := new(big.Int).Neg(m)
+	gamma_exp_neg_m := new(big.Int).Exp(privateKey.Gamma(), negM, privateKey.N)
+	times_c := new(big.Int).Mul(c, gamma_exp_neg_m)
+	cprime := new(big.Int).Mod(times_c, privateKey.N)
+
+	// 5. (Paillier Step 3) m2 = c'^(n^{-1} mod lambda) mod n
+	// 5. (This code) rho = cprime^{N^-1 mod LambdaN} mod N
+	nInv := new(big.Int).ModInverse(privateKey.N, privateKey.LambdaN)
+	rho = new(big.Int).Exp(cprime, nInv, privateKey.N)
+
+	return m, rho, nil
 }
 
 // ----- //

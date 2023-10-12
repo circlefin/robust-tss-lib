@@ -70,7 +70,9 @@ func TestE2EConcurrent(t *testing.T) {
 	}
 
 	var ended int32
+
 signing:
+
 	for {
 		fmt.Printf("ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
 		select {
@@ -179,7 +181,9 @@ func TestE2EWithHDKeyDerivation(t *testing.T) {
 	}
 
 	var ended int32
+
 signing:
+
 	for {
 		select {
 		case err := <-errCh:

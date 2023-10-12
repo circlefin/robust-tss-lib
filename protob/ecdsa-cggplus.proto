@@ -1,0 +1,65 @@
+// Copyright 2023 Circle
+//
+
+
+syntax = "proto3";
+package binance.tsslib.ecdsa.cggplus;
+option go_package = "ecdsa/cggplus";
+
+/*
+ * Represents a broadcast message during Round 1 of the accountable cgg+ ECDSA TSS signing protocol.
+ */
+message SignRound1Message {
+    bytes bigG = 1;
+    bytes bigK = 2;
+    repeated bytes psi = 3;
+}
+
+/*
+ * Represents a broadcast message during Round 2 of the accountable cgg+ ECDSA TSS signing protocol.
+ */
+message SignRound2Message1 {
+    bytes recipient = 1;
+    bytes big_d = 2;
+    bytes big_d_hat = 3;
+    bytes big_f = 4;
+    bytes big_f_hat = 5;
+    repeated bytes psi = 6;
+    repeated bytes psi_hat = 7;
+}
+
+/*
+ * Represents a broadcast message during Round 2 of the accountable cgg+ ECDSA TSS signing protocol.
+ */
+message SignRound2Message2 {
+    repeated bytes point_gamma = 1;
+    repeated bytes psi_prime = 2;
+}
+
+/*
+ * Represents a broadcast message during Round 3 of the accountable cgg+ ECDSA TSS signing protocol.
+ */
+message SignRound3Message {
+    bytes delta = 1;
+    repeated bytes bigDelta = 2;
+    bytes h = 3;
+    repeated bytes psi_prime_prime = 4;
+    repeated bytes h_proof = 5;
+    repeated bytes delta_proof = 6;
+}
+
+/*
+ * Represents a broadcast message during Round 4 of the accountable cgg+ ECDSA TSS signing protocol.
+ */
+message SignRound4Message {
+}
+
+/*
+  * Represents a broadcast message during Round 5 of the accountable cgg+ ECDSA TSS signing protocol.
+  */
+ message SignRound5Message {
+     bytes sigma = 1;
+     bytes big_h_hat = 2;
+     repeated bytes big_h_hat_proof = 3;
+     repeated bytes big_sigma_proof = 4;
+ }
