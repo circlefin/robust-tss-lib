@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Test
-    runs-on: circle-small
+    runs-on: ubuntu-latest
     steps:
 
     - name: Set up Go 1.18
