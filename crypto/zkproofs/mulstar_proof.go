@@ -1,4 +1,5 @@
-// Copyright 2023 Circle
+//  Copyright (c) 2023, Circle Internet Financial, LTD.
+//  All rights reserved
 //
 // This file implements proof mul* from CGG21 Appendix C.6 Figure 31.
 // The prover has secret (x, rho) and

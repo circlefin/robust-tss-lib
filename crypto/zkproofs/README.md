@@ -1,3 +1,6 @@
+Copyright (c) 2023, Circle Internet Financial, LTD. 
+All rights reserved
+
 # Go package crypto/zkproofs
 This package contains various zero knowledge proofs of knowledge. The source of these 
 proofs is CGG21:
@@ -16,9 +19,8 @@ List of proofs in this package
 * mul Appendix C.6 Figure 29
 * mul* Appendix C.6. Figure 31
 
+There is also one additional proof aff-g-inv that is based on aff-g.
+
 Some of the proofs require obtaining the randomness used to
 generate a Paillier ciphertext. The `crypto/paillier` package
 has a function to do this computation.
-
-Note there is a rust package https://github.com/ZenGo-X/zk-paillier that implements
-the same functionality with slightly different techniques.

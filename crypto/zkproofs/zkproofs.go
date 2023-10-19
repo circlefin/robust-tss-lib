@@ -1,3 +1,6 @@
+//  Copyright (c) 2023, Circle Internet Financial, LTD.
+//  All rights reserved
+//
 package zkproofs
 
 import (

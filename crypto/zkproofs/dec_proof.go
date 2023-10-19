@@ -1,4 +1,5 @@
-// Copyright 2023 Circle
+//  Copyright (c) 2023, Circle Internet Financial, LTD.
+//  All rights reserved
 //
 // This file implements proof dec in CGG21 Appendix C6 Figure 30.
 // The prover has secret input (y, rho) and

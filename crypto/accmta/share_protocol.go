@@ -1,6 +1,5 @@
-// Copyright © 2023 Circle
-//
-// This file implements the accountable mta protocols
+//  Copyright (c) 2023, Circle Internet Financial, LTD.
+//  All rights reserved
 
 package accmta
 

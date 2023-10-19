@@ -1,4 +1,5 @@
-// Copyright 2023 Circle
+//  Copyright (c) 2023, Circle Internet Financial, LTD.
+//  All rights reserved
 //
 // This file implements proof aff-p from CGG21 Appendix C.3 Figure 26.
 // The prover has secret input (x, y, rho, rhox, rhoy) and the

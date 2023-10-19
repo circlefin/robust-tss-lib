@@ -1,4 +1,5 @@
-// Copyright 2023 Circle
+//  Copyright (c) 2023, Circle Internet Financial, LTD.
+//  All rights reserved
 //
 // This file implements proof log* from CGG21 Appendix C.2 Figure 25.
 // The Prover has secret input (x, rho) and

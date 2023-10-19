@@ -12,6 +12,9 @@
 // * Encrypted integers and unencrypted integers can be added together
 //
 // Implementation adheres to GG18Spec (6)
+//
+//  Portions Copyright (c) 2023, Circle Internet Financial, LTD.
+//  All rights reserved
 
 package paillier
 
