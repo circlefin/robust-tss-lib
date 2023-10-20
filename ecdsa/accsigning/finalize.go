@@ -1,6 +1,12 @@
-//  Copyright (c) 2023, Circle Internet Financial, LTD.
+// Copyright © 2019 Binance
+//
+// This file is part of Binance. The full Binance copyright notice, including
+// terms governing use, modification, and redistribution, is contained in the
+// file LICENSE at the root of the source code distribution tree.
+//
+//  Portions Copyright (c) 2023, Circle Internet Financial, LTD.
 //  All rights reserved
-//  SPDX-License-Identifier: Apache-2.0
+//  SPDX-License-Identifier: Apache-2.0 AND MIT
 //
 
 package accsigning
