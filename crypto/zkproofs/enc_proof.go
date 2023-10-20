@@ -1,5 +1,6 @@
 //  Copyright (c) 2023, Circle Internet Financial, LTD.
 //  All rights reserved
+//  SPDX-License-Identifier: Apache-2.0
 //
 // This file implements proof enc from CGG21 Section 6.1 Figure 14.
 // The prover has secret input (k, rho) and the

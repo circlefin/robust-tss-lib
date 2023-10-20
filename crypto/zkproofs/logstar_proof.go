@@ -1,5 +1,6 @@
 //  Copyright (c) 2023, Circle Internet Financial, LTD.
 //  All rights reserved
+//  SPDX-License-Identifier: Apache-2.0
 //
 // This file implements proof log* from CGG21 Appendix C.2 Figure 25.
 // The Prover has secret input (x, rho) and

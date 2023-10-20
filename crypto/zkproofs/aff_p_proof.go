@@ -1,5 +1,6 @@
 //  Copyright (c) 2023, Circle Internet Financial, LTD.
 //  All rights reserved
+//  SPDX-License-Identifier: Apache-2.0
 //
 // This file implements proof aff-p from CGG21 Appendix C.3 Figure 26.
 // The prover has secret input (x, y, rho, rhox, rhoy) and the

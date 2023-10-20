@@ -1,5 +1,7 @@
 #  Portions Copyright (c) 2023, Circle Internet Financial, LTD.
 #  All rights reserved
+#  SPDX-License-Identifier: Apache-2.0 AND MIT
+
 
 MODULE = github.com/bnb-chain/tss-lib
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')

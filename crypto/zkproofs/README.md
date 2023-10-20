@@ -1,5 +1,6 @@
 Copyright (c) 2023, Circle Internet Financial, LTD. 
-All rights reserved
+All rights reserved.
+SPDX-License-Identifier: Apache-2.0
 
 # Go package crypto/zkproofs
 This package contains various zero knowledge proofs of knowledge. The source of these 

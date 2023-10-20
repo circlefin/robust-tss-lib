@@ -1,5 +1,6 @@
 //  Copyright (c) 2023, Circle Internet Financial, LTD.
 //  All rights reserved
+//  SPDX-License-Identifier: Apache-2.0
 //
 // This file implements proof mul* from CGG21 Appendix C.6 Figure 31.
 // The prover has secret (x, rho) and
