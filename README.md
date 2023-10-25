@@ -159,7 +159,7 @@ Timeouts and errors should be handled by your application. The method `WaitingFo
 This library has not been reviewed by any outside parties. Any security audits or statements about the security
 of the original Binance tss-lib do not apply to this library. We have added our own code and modified the original
 code in ways that void prior statements. This library is provided as is, with no guarantees,
-to be used at your own risk as described in the Apache 2.0 License.
+to be used at your own risk as described in the Apache 2.0 License. 
 
 ## References
 \[1\] https://eprint.iacr.org/2019/114.pdf
