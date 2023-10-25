@@ -1,6 +1,7 @@
-#  Portions Copyright (c) 2023, Circle Internet Financial, LTD.
-#  All rights reserved
-#  SPDX-License-Identifier: Apache-2.0 AND MIT
+# Portions Copyright (c) 2023, Circle Internet Financial, LTD.  All rights reserved
+# Circle contributions are licensed under the Apache 2.0 License.
+#
+# SPDX-License-Identifier: Apache-2.0 AND MIT
 
 
 MODULE = github.com/bnb-chain/tss-lib
