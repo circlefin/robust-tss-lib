@@ -20,9 +20,9 @@ The `ecdsa\cggplus` module for ECDSA is based on Canneti et al. CCS20 [2].
 
 This library includes three protocols:
 
-* Key Generation for creating secret shares with no trusted dealer ("keygen").
-* Signing for using the secret shares to generate a signature ("signing" and "cggplus").
-* Dynamic Groups to change the group of participants while keeping the secret ("resharing").
+* Key Generation for creating secret shares with no trusted dealer (`keygen`).
+* Signing for using the secret shares to generate a signature (`signing` and `cggplus`).
+* Dynamic Groups to change the group of participants while keeping the secret (`resharing`).
 
 ⚠️ Do not miss [these important notes](#how-to-use-this-securely) on implementing this library securely
 
