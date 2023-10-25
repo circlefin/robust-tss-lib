@@ -1,16 +1,15 @@
 # Multi-Party Threshold Signature Scheme
-[![MIT licensed][1]][2] [![GoDoc][3]][4] [![Go Report Card][5]][6]
 
-[1]: https://img.shields.io/badge/license-MIT-blue.svg
-[2]: LICENSE
-[3]: https://godoc.org/github.com/bnb-chain/tss-lib?status.svg
-[4]: https://godoc.org/github.com/bnb-chain/tss-lib
-[5]: https://goreportcard.com/badge/github.com/bnb-chain/tss-lib
-[6]: https://goreportcard.com/report/github.com/bnb-chain/tss-lib
+## License
 
-Permissively MIT Licensed.
+This work is dual-licensed under Apache 2.0 and MIT.
+Portions contributed by Circle are licensed under Apache 2.0;
+see SPDX-License-Identifier in the file headings.
 
-Note! This is a library for developers. You may find a TSS tool that you can use with the Binance Chain CLI [here](https://docs.binance.org/tss.html).
+`SPDX-License-Identifier: Apache-2.0 AND MIT`
+
+## Note
+This is a library for developers. You may find a TSS tool that you can use with the Binance Chain CLI [here](https://docs.binance.org/tss.html).
 
 ## Introduction
 This is an implementation of multi-party {t,n}-threshold ECDSA (Elliptic Curve Digital Signature Algorithm) based on Gennaro and Goldfeder CCS 2018 [1] and EdDSA (Edwards-curve Digital Signature Algorithm) following a similar approach.

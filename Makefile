@@ -1,3 +1,9 @@
+# Portions Copyright (c) 2023, Circle Internet Financial, LTD.  All rights reserved
+# Circle contributions are licensed under the Apache 2.0 License.
+#
+# SPDX-License-Identifier: Apache-2.0 AND MIT
+
+
 MODULE = github.com/bnb-chain/tss-lib
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')
 
@@ -8,7 +14,7 @@ all: protob test
 
 protob:
 	@echo "--> Building Protocol Buffers"
-	@for protocol in message signature ecdsa-cggplus ecdsa-accsigning ecdsa-keygen ecdsa-signing ecdsa-resharing eddsa-keygen eddsa-signing eddsa-resharing; do \
+	@for protocol in message signature ecdsa-cggplus ecdsa-keygen ecdsa-signing ecdsa-resharing eddsa-keygen eddsa-signing eddsa-resharing; do \
 		echo "Generating $$protocol.pb.go" ; \
 		protoc --go_out=. ./protob/$$protocol.proto ; \
 	done
@@ -28,7 +34,6 @@ test_unit:
 	@echo "!!! WARNING: This will take a long time :)"
 	go test -timeout 60m github.com/bnb-chain/tss-lib/crypto/accmta
 	go test -timeout 60m github.com/bnb-chain/tss-lib/crypto/zkproofs
-#	go test -timeout 60m github.com/bnb-chain/tss-lib/ecdsa/accsigning
 	go test -timeout 60m github.com/bnb-chain/tss-lib/ecdsa/cggplus
 #	go test -timeout 60m $(PACKAGES)
 

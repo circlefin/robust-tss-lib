@@ -3,7 +3,12 @@
 // This file is part of Binance. The full Binance copyright notice, including
 // terms governing use, modification, and redistribution, is contained in the
 // file LICENSE at the root of the source code distribution tree.
-
+//
+// Portions Copyright (c) 2023, Circle Internet Financial, LTD.  All rights reserved
+// Circle contributions are licensed under the Apache 2.0 License.
+//
+// SPDX-License-Identifier: Apache-2.0 AND MIT
+//
 // The Paillier Crypto-system is an additive crypto-system. This means that given two ciphertexts, one can perform operations equivalent to adding the respective plain texts.
 // Additionally, Paillier Crypto-system supports further computations:
 //
@@ -12,6 +17,7 @@
 // * Encrypted integers and unencrypted integers can be added together
 //
 // Implementation adheres to GG18Spec (6)
+//
 
 package paillier
 
