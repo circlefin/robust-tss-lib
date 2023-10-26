@@ -12,13 +12,16 @@ see SPDX-License-Identifier in the file headings.
 This is a library for developers. You may find a TSS tool that you can use with the Binance Chain CLI [here](https://docs.binance.org/tss.html).
 
 ## Introduction
-This is an implementation of multi-party {t,n}-threshold ECDSA (Elliptic Curve Digital Signature Algorithm) based on Gennaro and Goldfeder CCS 2018 [1] and EdDSA (Edwards-curve Digital Signature Algorithm) following a similar approach.
+This is an implementation of multi-party {t,n}-threshold ECDSA (Elliptic Curve Digital Signature Algorithm).
+It implements several signing algorithms. The `ecdsa\signing` module is based on Gennaro and Goldfeder CCS 2018 [1]
+and the `eddsa\signing` module for EdDSA (Edwards-curve Digital Signature Algorithm) follows a similar approach.
+The `ecdsa\cggplus` module for ECDSA is based on Canneti et al. CCS20 [2].
 
 This library includes three protocols:
 
-* Key Generation for creating secret shares with no trusted dealer ("keygen").
-* Signing for using the secret shares to generate a signature ("signing").
-* Dynamic Groups to change the group of participants while keeping the secret ("resharing").
+* Key Generation for creating secret shares with no trusted dealer (`keygen`).
+* Signing for using the secret shares to generate a signature (`signing` and `cggplus`).
+* Dynamic Groups to change the group of participants while keeping the secret (`resharing`).
 
 ⚠️ Do not miss [these important notes](#how-to-use-this-securely) on implementing this library securely
 
@@ -38,7 +41,7 @@ There is also a performance bonus in that blockchain nodes may check the validit
 ## Usage
 You should start by creating an instance of a `LocalParty` and giving it the arguments that it needs.
 
-The `LocalParty` that you use should be from the `keygen`, `signing` or `resharing` package depending on what you want to do.
+The `LocalParty` that you use should be from the `keygen`, `signing`, `cggplus`, or `resharing` package depending on what you want to do.
 
 ### Setup
 ```go
@@ -82,13 +85,16 @@ go func() {
 }()
 ```
 
-### Signing
-Use the `signing.LocalParty` for signing and provide it with a `message` to sign. It requires the key data obtained from the keygen protocol. The signature will be sent through the `endCh` once completed.
+### Signing and Cggplus
+The `signing` and `cggplus` modules sign messages. Existing deployments can switch from `signing` to `cggplus` without
+updating their keys. All `t+1` signers must use the same signing algorithm during signing.
+
+Use the `signing.LocalParty` or `cggplus.LocalParty` for signing and provide it with a `message` to sign. It requires the key data obtained from the keygen protocol. The signature will be sent through the `endCh` once completed.
 
 Please note that `t+1` signers are required to sign a message and for optimal usage no more than this should be involved. Each signer should have the same view of who the `t+1` signers are.
 
 ```go
-party := signing.NewLocalParty(message, params, ourKeyData, outCh, endCh)
+party := cggplus.NewLocalParty(message, params, ourKeyData, outCh, endCh)
 go func() {
     err := party.Start()
     // handle err ...
@@ -150,8 +156,12 @@ Additionally, there should be a mechanism in your transport to allow for "reliab
 Timeouts and errors should be handled by your application. The method `WaitingFor` may be called on a `Party` to get the set of other parties that it is still waiting for messages from. You may also get the set of culprit parties that caused an error from a `*tss.Error`.
 
 ## Security Audit
-A full review of this library was carried out by Kudelski Security and their final report was made available in October, 2019. A copy of this report [`audit-binance-tss-lib-final-20191018.pdf`](https://github.com/bnb-chain/tss-lib/releases/download/v1.0.0/audit-binance-tss-lib-final-20191018.pdf) may be found in the v1.0.0 release notes of this repository.
+This library has not been reviewed by any outside parties. Any security audits or statements about the security
+of the original Binance tss-lib do not apply to this library. We have added our own code and modified the original
+code in ways that void prior statements. This library is provided as is, with no guarantees,
+to be used at your own risk as described in the Apache 2.0 License. 
 
 ## References
 \[1\] https://eprint.iacr.org/2019/114.pdf
+\[2\] https://eprint.iacr.org/2021/060
 
