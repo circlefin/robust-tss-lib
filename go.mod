@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/agl/ed25519 v0.0.0-20200225211852-fd4d107ace12
-	github.com/btcsuite/btcd v0.0.0-20190629003639-c26ffa870fd8 // upgrade will require code change
+	github.com/btcsuite/btcd v0.23.2 // upgrade will require code change
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d // upgrade will require code change
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/edwards/v2 v2.0.3
@@ -19,6 +19,7 @@ require (
 )
 
 require (
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/ipfs/go-log/v2 v2.1.3 // indirect
@@ -26,6 +27,8 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
