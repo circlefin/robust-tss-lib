@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/bnb-chain/tss-lib/common"
+	"github.com/bnb-chain/tss-lib/v2/common"
 )
 
 const (

@@ -20,10 +20,10 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/bnb-chain/tss-lib/crypto"
-	"github.com/bnb-chain/tss-lib/crypto/accmta"
-	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
-	"github.com/bnb-chain/tss-lib/tss"
+	"github.com/bnb-chain/tss-lib/v2/crypto"
+	"github.com/bnb-chain/tss-lib/v2/crypto/accmta"
+	"github.com/bnb-chain/tss-lib/v2/crypto/zkproofs"
+	"github.com/bnb-chain/tss-lib/v2/tss"
 )
 
 func (round *round2) Start() *tss.Error {

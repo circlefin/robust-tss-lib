@@ -16,17 +16,10 @@ import (
 	"errors"
 	"math/big"
 
-<<<<<<< HEAD
 	"github.com/bnb-chain/tss-lib/v2/crypto"
 	"github.com/bnb-chain/tss-lib/v2/crypto/paillier"
 	"github.com/bnb-chain/tss-lib/v2/crypto/zkproofs"
 	"github.com/bnb-chain/tss-lib/v2/tss"
-=======
-	"github.com/bnb-chain/tss-lib/crypto"
-	"github.com/bnb-chain/tss-lib/crypto/paillier"
-	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
-	"github.com/bnb-chain/tss-lib/tss"
->>>>>>> d8333a5 (Accountable CGG21 and GG18 (#6))
 )
 
 type (
