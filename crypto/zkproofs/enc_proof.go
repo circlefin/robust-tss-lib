@@ -28,8 +28,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/bnb-chain/tss-lib/common"
-	"github.com/bnb-chain/tss-lib/crypto/paillier"
+	"github.com/bnb-chain/tss-lib/v2/common"
+	"github.com/bnb-chain/tss-lib/v2/crypto/paillier"
 )
 
 const (
@@ -137,9 +137,9 @@ func (proof *EncProof) Verify(stmt *EncStatement, rp *RingPedersenParams) bool {
 	// check (1+N0)^z1 * z2^N0 mod N02 == A * K^e mod N02
 	N02 := new(big.Int).Mul(stmt.N0, stmt.N0)
 	pkN0 := &paillier.PublicKey{N: stmt.N0}
-	left1, err := pkN0.EncryptWithRandomness(proof.Z1, proof.Z2)
+	left1 := pkN0.EncryptWithRandomnessNoErrChk(proof.Z1, proof.Z2)
 	right1 := ATimesBToTheCModN(proof.A, stmt.K, e, N02)
-	if err != nil || left1.Cmp(right1) != 0 {
+	if left1.Cmp(right1) != 0 {
 		return false
 	}
 

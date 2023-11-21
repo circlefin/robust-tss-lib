@@ -17,9 +17,9 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/bnb-chain/tss-lib/common"
-	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
-	"github.com/bnb-chain/tss-lib/tss"
+	"github.com/bnb-chain/tss-lib/v2/common"
+	"github.com/bnb-chain/tss-lib/v2/crypto/zkproofs"
+	"github.com/bnb-chain/tss-lib/v2/tss"
 )
 
 func (round *finalization) Start() *tss.Error {

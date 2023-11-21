@@ -16,10 +16,10 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/bnb-chain/tss-lib/crypto"
-	"github.com/bnb-chain/tss-lib/crypto/paillier"
-	"github.com/bnb-chain/tss-lib/crypto/zkproofs"
-	"github.com/bnb-chain/tss-lib/tss"
+	"github.com/bnb-chain/tss-lib/v2/crypto"
+	"github.com/bnb-chain/tss-lib/v2/crypto/paillier"
+	"github.com/bnb-chain/tss-lib/v2/crypto/zkproofs"
+	"github.com/bnb-chain/tss-lib/v2/tss"
 )
 
 type (
@@ -74,6 +74,8 @@ func (preParams LocalPreParams) Validate() bool {
 
 func (preParams LocalPreParams) ValidateWithProof() bool {
 	return preParams.Validate() &&
+		preParams.PaillierSK.P != nil &&
+		preParams.PaillierSK.Q != nil &&
 		preParams.Alpha != nil &&
 		preParams.Beta != nil &&
 		preParams.P != nil &&

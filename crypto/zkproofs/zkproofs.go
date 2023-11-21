@@ -22,7 +22,7 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/bnb-chain/tss-lib/common"
+	"github.com/bnb-chain/tss-lib/v2/common"
 )
 
 type Proof interface {

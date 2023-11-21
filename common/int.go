@@ -86,3 +86,14 @@ func (mi *modInt) IsMultInverse(a, b *big.Int) bool {
 func (mi *modInt) i() *big.Int {
 	return (*big.Int)(mi)
 }
+
+func IsInInterval(b *big.Int, bound *big.Int) bool {
+	return b.Cmp(bound) == -1 && b.Cmp(zero) >= 0
+}
+
+func AppendBigIntToBytesSlice(commonBytes []byte, appended *big.Int) []byte {
+	resultBytes := make([]byte, len(commonBytes), len(commonBytes)+len(appended.Bytes()))
+	copy(resultBytes, commonBytes)
+	resultBytes = append(resultBytes, appended.Bytes()...)
+	return resultBytes
+}

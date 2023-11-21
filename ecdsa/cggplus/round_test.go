@@ -17,7 +17,7 @@
 package cggplus
 
 import (
-	//	"github.com/bnb-chain/tss-lib/tss"
+	//	"github.com/bnb-chain/tss-lib/v2/tss"
 	//	"sync"
 	"testing"
 )
