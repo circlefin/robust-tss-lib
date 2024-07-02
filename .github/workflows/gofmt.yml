@@ -22,6 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: check out
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: go fmt project
         uses: Jerome1337/gofmt-action@v1.0.4
