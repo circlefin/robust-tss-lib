@@ -1,6 +1,6 @@
 module github.com/bnb-chain/tss-lib/v2
 
-go 1.18
+go 1.23
 
 require (
 	github.com/agl/ed25519 v0.0.0-20200225211852-fd4d107ace12
